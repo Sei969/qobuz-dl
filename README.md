@@ -1,6 +1,6 @@
 # qobuz-dl Ultimate
 Search, explore, and download Lossless and Hi-Res music from [Qobuz](https://www.qobuz.com/).
-This is an enhanced, feature-rich fork of the original qobuz-dl project, designed for the ultimate audiophile experience.
+This is an enhanced, feature-rich fork of the original qobuz-dl project, designed for the ultimate audiophile experience. It includes extensive, native support for classical music metadata to keep your library perfectly organized.
 
 ## Features & Ultimate Additions
 
