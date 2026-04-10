@@ -1,12 +1,11 @@
 import configparser
-import hashlib
 import logging
 import glob
 import os
 import sys
+import getpass
 
-from qobuz_dl.bundle import Bundle
-from qobuz_dl.color import GREEN, RED, YELLOW
+from qobuz_dl.color import GREEN, RED, YELLOW, OFF
 from qobuz_dl.commands import qobuz_dl_args
 from qobuz_dl.core import QobuzDL
 from qobuz_dl.downloader import DEFAULT_FOLDER, DEFAULT_TRACK
@@ -27,46 +26,63 @@ QOBUZ_DB = os.path.join(CONFIG_PATH, "qobuz_dl.db")
 
 
 def _reset_config(config_file):
-    logging.info(f"{YELLOW}Creating config file: {config_file}")
+    logging.info(f"\n{YELLOW}--- QOBUZ-DL CONFIGURATION WIZARD (2026 Update) ---{OFF}")
     config = configparser.ConfigParser()
-    config["DEFAULT"]["email"] = input("Enter your email:\n- ")
-    password = input("Enter your password\n- ")
-    config["DEFAULT"]["password"] = hashlib.md5(password.encode("utf-8")).hexdigest()
-    config["DEFAULT"]["default_folder"] = (
-        input("Folder for downloads (leave empty for default 'Qobuz Downloads')\n- ")
-        or "Qobuz Downloads"
+    
+    # Create specific [qobuz] section to avoid 'corrupted' errors
+    config["qobuz"] = {}
+    
+    email = input("Enter your Qobuz email:\n- ").strip()
+    config["qobuz"]["email"] = email
+    
+    print(f"{YELLOW}[!] If you prefer to use the browser Auth Token, leave the password blank.{OFF}")
+    password = getpass.getpass("Enter your password (it will be hidden):\n- ").strip()
+    config["qobuz"]["password"] = password
+    
+    auth_token = ""
+    if not password:
+        auth_token = input("Paste your browser user_auth_token here:\n- ").strip()
+    config["qobuz"]["auth_token"] = auth_token
+
+    # --- NEW: LYRICS CONFIGURATION ---
+    fetch_lyrics = input("Do you want to automatically download and inject lyrics? (yes/no) [Default: yes]\n- ").strip().lower()
+    config["qobuz"]["fetch_lyrics"] = "false" if fetch_lyrics in ['no', 'n', 'false'] else "true"
+    
+    genius_token = ""
+    if config["qobuz"]["fetch_lyrics"] == "true":
+        print(f"{YELLOW}[!] To use Genius as a fallback, enter your API Token. Leave blank to only use LRCLIB (Free/No API).{OFF}")
+        genius_token = input("Genius API Token:\n- ").strip()
+    config["qobuz"]["genius_token"] = genius_token
+    # -----------------------------------
+
+    config["qobuz"]["default_folder"] = (
+        input("Download folder (press Enter for '.' current directory)\n- ")
+        or "."
     )
-    config["DEFAULT"]["default_quality"] = (
-        input(
-            "Download quality (5, 6, 7, 27) "
-            "[320, LOSSLESS, 24B <96KHZ, 24B >96KHZ]"
-            "\n(leave empty for default '6')\n- "
-        )
-        or "6"
+    config["qobuz"]["default_quality"] = (
+        input("Download quality (5:MP3, 6:FLAC, 7:24b<96, 27:24b>96) [Default 27]\n- ")
+        or "27"
     )
-    config["DEFAULT"]["default_limit"] = "20"
-    config["DEFAULT"]["no_m3u"] = "false"
-    config["DEFAULT"]["albums_only"] = "false"
-    config["DEFAULT"]["no_fallback"] = "false"
-    config["DEFAULT"]["og_cover"] = "false"
-    config["DEFAULT"]["embed_art"] = "false"
-    config["DEFAULT"]["no_cover"] = "false"
-    config["DEFAULT"]["no_database"] = "false"
-    logging.info(f"{YELLOW}Getting tokens. Please wait...")
-    bundle = Bundle()
-    config["DEFAULT"]["app_id"] = str(bundle.get_app_id())
-    config["DEFAULT"]["secrets"] = ",".join(bundle.get_secrets().values())
-    config["DEFAULT"]["folder_format"] = DEFAULT_FOLDER
-    config["DEFAULT"]["track_format"] = DEFAULT_TRACK
-    config["DEFAULT"]["smart_discography"] = "false"
+    
+    config["qobuz"]["default_limit"] = "500"
+    config["qobuz"]["no_m3u"] = "false"
+    config["qobuz"]["albums_only"] = "false"
+    config["qobuz"]["no_fallback"] = "false"
+    config["qobuz"]["og_cover"] = "true"
+    config["qobuz"]["embed_art"] = "true"
+    config["qobuz"]["no_cover"] = "false"
+    config["qobuz"]["no_database"] = "false"
+    config["qobuz"]["app_id"] = "470123565"
+    config["qobuz"]["secrets"] = "96924823297a47568581f3d537f14b62"
+    config["qobuz"]["folder_format"] = "{artist} - {album}"
+    config["qobuz"]["track_format"] = "{tracknumber} {tracktitle}"
+    config["qobuz"]["smart_discography"] = "false"
+
     with open(config_file, "w") as configfile:
         config.write(configfile)
-    logging.info(
-        f"{GREEN}Config file updated. Edit more options in {config_file}"
-        "\nso you don't have to call custom flags every time you run "
-        "a qobuz-dl command."
-    )
-
+        
+    logging.info(f"\n{GREEN}[+] Configuration successfully saved in {config_file}!{OFF}")
+    
 
 def _remove_leftovers(directory):
     directory = os.path.join(directory, "**", ".*.tmp")
@@ -92,8 +108,7 @@ def _handle_commands(qobuz, arguments):
 
     except KeyboardInterrupt:
         logging.info(
-            f"{RED}Interrupted by user\n{YELLOW}Already downloaded items will "
-            "be skipped if you try to download the same releases again."
+            f"\n{RED}Interrupted by user.{OFF}\n{YELLOW}Already downloaded files will be skipped on the next run.{OFF}"
         )
 
     finally:
@@ -115,43 +130,63 @@ def main():
     config = configparser.ConfigParser()
     config.read(CONFIG_FILE)
 
+    # TICKET FIX: Reading from [qobuz] section instead of [DEFAULT]
+    # We use .get() with fallback to prevent crashes if rows are missing
     try:
-        email = config["DEFAULT"]["email"]
-        password = config["DEFAULT"]["password"]
-        default_folder = config["DEFAULT"]["default_folder"]
-        default_limit = config["DEFAULT"]["default_limit"]
-        default_quality = config["DEFAULT"]["default_quality"]
-        no_m3u = config.getboolean("DEFAULT", "no_m3u")
-        albums_only = config.getboolean("DEFAULT", "albums_only")
-        no_fallback = config.getboolean("DEFAULT", "no_fallback")
-        og_cover = config.getboolean("DEFAULT", "og_cover")
-        embed_art = config.getboolean("DEFAULT", "embed_art")
-        no_cover = config.getboolean("DEFAULT", "no_cover")
-        no_database = config.getboolean("DEFAULT", "no_database")
-        app_id = config["DEFAULT"]["app_id"]
-        smart_discography = config.getboolean("DEFAULT", "smart_discography")
-        folder_format = config["DEFAULT"]["folder_format"]
-        track_format = config["DEFAULT"]["track_format"]
+        section = "qobuz" if config.has_section("qobuz") else "DEFAULT"
+        
+        email = config.get(section, "email")
+        token = config.get(section, "auth_token", fallback="")
+        password = token if token else config.get(section, "password")
+        
+        # --- READ LYRICS SETTINGS ---
+        fetch_lyrics = config.getboolean(section, "fetch_lyrics", fallback=False)
+        genius_token = config.get(section, "genius_token", fallback=None)
+        
+        default_folder = config.get(section, "default_folder")
+        default_limit = config.get(section, "default_limit")
+        default_quality = config.get(section, "default_quality")
+        
+        no_m3u = config.getboolean(section, "no_m3u", fallback=False)
+        albums_only = config.getboolean(section, "albums_only", fallback=False)
+        no_fallback = config.getboolean(section, "no_fallback", fallback=False)
+        og_cover = config.getboolean(section, "og_cover", fallback=True)
+        embed_art = config.getboolean(section, "embed_art", fallback=True)
+        no_cover = config.getboolean(section, "no_cover", fallback=False)
+        no_database = config.getboolean(section, "no_database", fallback=False)
+        
+        app_id = config.get(section, "app_id")
+        secrets = [s for s in config.get(section, "secrets").split(",") if s]
+        
+        smart_discography = config.getboolean(section, "smart_discography", fallback=False)
+        folder_format = config.get(section, "folder_format", fallback=DEFAULT_FOLDER)
+        track_format = config.get(section, "track_format", fallback=DEFAULT_TRACK)
 
-        secrets = [
-            secret for secret in config["DEFAULT"]["secrets"].split(",") if secret
-        ]
         arguments = qobuz_dl_args(
             default_quality, default_limit, default_folder
         ).parse_args()
-    except (KeyError, UnicodeDecodeError, configparser.Error) as error:
+        
+        # --- OVERRIDE VIA CLI ARGS ---
+        if getattr(arguments, 'no_lyrics', False):
+            fetch_lyrics = False
+            
+        force_english = not getattr(arguments, 'native_lang', False)
+        no_credits_flag = getattr(arguments, 'no_credits', False) # <-- NEW FLAG CAPTURE
+        # -----------------------------
+        
+    except (configparser.Error, KeyError) as error:
         arguments = qobuz_dl_args().parse_args()
         if not arguments.reset:
             sys.exit(
-                f"{RED}Your config file is corrupted: {error}! "
-                "Run 'qobuz-dl -r' to fix this."
+                f"{RED}Invalid or corrupted configuration ({error}).\n{OFF}"
+                f"{YELLOW}Run 'python -m qobuz_dl -r' to fix this.{OFF}"
             )
 
     if arguments.reset:
         sys.exit(_reset_config(CONFIG_FILE))
 
     if arguments.show_config:
-        print(f"Configuation: {CONFIG_FILE}\nDatabase: {QOBUZ_DB}\n---")
+        print(f"Configuration: {CONFIG_FILE}\nDatabase: {QOBUZ_DB}\n---")
         with open(CONFIG_FILE, "r") as f:
             print(f.read())
         sys.exit()
@@ -161,10 +196,13 @@ def main():
             os.remove(QOBUZ_DB)
         except FileNotFoundError:
             pass
-        sys.exit(f"{GREEN}The database was deleted.")
+        sys.exit(f"{GREEN}Database has been purged.{OFF}")
+
+    # FIX: Resolved hardcoded path issue to support cross-platform usage
+    directory_to_use = arguments.directory if hasattr(arguments, 'directory') and arguments.directory else default_folder
 
     qobuz = QobuzDL(
-        arguments.directory,
+        directory_to_use,
         arguments.quality,
         arguments.embed_art or embed_art,
         ignore_singles_eps=arguments.albums_only or albums_only,
@@ -176,11 +214,17 @@ def main():
         folder_format=arguments.folder_format or folder_format,
         track_format=arguments.track_format or track_format,
         smart_discography=arguments.smart_discography or smart_discography,
+        # --- ACTIVATE LYRICS ENGINE & METADATA OVERRIDES ---
+        fetch_lyrics=fetch_lyrics,
+        genius_token=genius_token,
+        force_english=force_english,
+        no_credits=no_credits_flag # <-- NEW PARAMETER PASSED TO CORE
     )
+    
     qobuz.initialize_client(email, password, app_id, secrets)
 
     _handle_commands(qobuz, arguments)
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

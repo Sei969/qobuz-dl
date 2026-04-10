@@ -52,6 +52,11 @@ class QobuzDL:
         "{sampling_rate}kHz]",
         track_format="{tracknumber}. {tracktitle}",
         smart_discography=False,
+        # --- LYRICS & METADATA PARAMETERS ---
+        fetch_lyrics=False,
+        genius_token=None,
+        force_english=True,
+        no_credits=False, # <-- NEW
     ):
         self.directory = create_and_return_dir(directory)
         self.quality = quality
@@ -68,9 +73,16 @@ class QobuzDL:
         self.folder_format = folder_format
         self.track_format = track_format
         self.smart_discography = smart_discography
+        
+        # --- NEW ASSIGNMENTS ---
+        self.fetch_lyrics = fetch_lyrics
+        self.genius_token = genius_token
+        self.force_english = force_english
+        self.no_credits = no_credits # <-- NEW
 
     def initialize_client(self, email, pwd, app_id, secrets):
-        self.client = qopy.Client(email, pwd, app_id, secrets)
+        # Pass the force_english flag to the API Client
+        self.client = qopy.Client(email, pwd, app_id, secrets, force_english=self.force_english)
         logger.info(f"{YELLOW}Set max quality: {QUALITIES[int(self.quality)]}\n")
 
     def get_tokens(self):
@@ -78,7 +90,7 @@ class QobuzDL:
         self.app_id = bundle.get_app_id()
         self.secrets = [
             secret for secret in bundle.get_secrets().values() if secret
-        ]  # avoid empty fields
+        ]  
 
     def download_from_id(self, item_id, album=True, alt_path=None):
         if handle_download_id(self.downloads_db, item_id, add_id=False):
@@ -101,6 +113,10 @@ class QobuzDL:
                 self.no_cover,
                 self.folder_format,
                 self.track_format,
+                # --- PASSING PARAMETERS TO DOWNLOADER ---
+                self.fetch_lyrics,
+                self.genius_token,
+                self.no_credits # <-- NEW PASS
             )
             dloader.download_id_by_type(not album)
             handle_download_id(self.downloads_db, item_id, add_id=True)

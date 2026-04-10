@@ -117,7 +117,6 @@ def add_common_arg(custom_parser, default_folder, default_quality):
         metavar="PATTERN",
         help="pattern for formatting track names. see `folder-format`.",
     )
-    # TODO: add customization options
     custom_parser.add_argument(
         "-s",
         "--smart-discography",
@@ -126,6 +125,22 @@ def add_common_arg(custom_parser, default_folder, default_quality):
         discography, and other optimizations. Filters albums not made by requested
         artist, and deluxe/live/collection albums. Gives preference to remastered
         albums, high bit depth/dynamic range, and low sampling rates (to save space).""",
+    )
+    # --- NEW COMMANDS FOR ULTIMATE FEATURES ---
+    custom_parser.add_argument(
+        "--no-lyrics",
+        action="store_true",
+        help="disable automatic lyrics fetching and injection for this session",
+    )
+    custom_parser.add_argument(
+        "--native-lang",
+        action="store_true",
+        help="do not force English; download metadata in the account's native language",
+    )
+    custom_parser.add_argument(
+        "--no-credits",
+        action="store_true",
+        help="disable the generation of the Digital Booklet.txt (Credits & Review) file",
     )
 
 
@@ -136,7 +151,7 @@ def qobuz_dl_args(
         prog="qobuz-dl",
         description=(
             "The ultimate Qobuz music downloader.\nSee usage"
-            " examples on https://github.com/vitiko98/qobuz-dl"
+            " examples on https://github.com/Sei969/qobuz-dl"
         ),
         formatter_class=argparse.RawTextHelpFormatter,
     )
