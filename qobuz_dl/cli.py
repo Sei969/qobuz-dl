@@ -59,9 +59,9 @@ def _reset_config(config_file):
         input("Download folder (press Enter for '.' current directory)\n- ")
         or "."
     )
-    config["qobuz"]["default_quality"] = (
-        input("Download quality (5:MP3, 6:FLAC, 7:24b<96, 27:24b>96) [Default 27]\n- ")
-        or "27"
+    cconfig["qobuz"]["default_folder"] = (
+        input(f"Download folder (press Enter for '{DEFAULT_FOLDER}')\n- ")
+        or DEFAULT_FOLDER
     )
     
     config["qobuz"]["default_limit"] = "500"
