@@ -31,7 +31,7 @@ QOBUZ_DB = os.path.join(CONFIG_PATH, "qobuz_dl.db")
 
 def _reset_config(config_file):
     logging.info(f"\n{YELLOW}--- QOBUZ-DL CONFIGURATION WIZARD (2026 Update) ---{OFF}")
-    config = configparser.ConfigParser()
+    config = configparser.ConfigParser(interpolation=None)
     
     config["qobuz"] = {}
     
@@ -174,7 +174,7 @@ def _initial_checks():
 def main():
     _initial_checks()
 
-    config = configparser.ConfigParser()
+    config = configparser.ConfigParser(interpolation=None)
     config.read(CONFIG_FILE)
 
     try:
