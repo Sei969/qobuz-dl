@@ -26,6 +26,19 @@ Search, explore, and download Lossless and Hi-Res music from [Qobuz](https://www
 * **Cover Art Sizing:** Granular control over the resolution of embedded artwork vs. locally saved artwork (e.g., `600`, `max`, `org`).
 * **Regional Bypass:** Forces English language for metadata, reviews, and digital booklets regardless of your account's native region (can be toggled off).
 
+## 🌉 Last.fm Smart Integration
+Import your personalized Last.fm playlists directly into Qobuz! **The original legacy implementation has been entirely removed and replaced by a modern, ground-up refactor to ensure superior stability and performance.** Simply paste a Last.fm playlist URL, and the engine will intelligently bridge the two platforms, finding and downloading the highest quality equivalents.
+
+### Smart Track Matching & Interactive Mode
+Track names often differ slightly between platforms (e.g., missing "Remastered" tags, differently formatted featured artists). To prevent downloading incorrect songs (like live covers or techno remixes), this fork utilizes a mathematical **Fuzzy Matching Algorithm**:
+
+* **Auto-Accept (> 75% similarity):** Perfect or near-perfect matches are automatically queued and downloaded.
+* **Auto-Skip (< 60% similarity):** Completely wrong tracks are automatically skipped, keeping your hard drive clean.
+* **Interactive Selection (60% - 74% similarity):** For borderline matches, the engine pauses and activates an interactive prompt. It displays the original Last.fm target alongside the Qobuz result, allowing you to manually approve or reject the track (`[y/n]`).
+
+**Usage:**
+    python -m qobuz_dl dl https://www.last.fm/user/<your profile>/playlists/<playlist_id>
+
 ## 📥 Getting Started
 
 > You'll need an **active subscription** to Qobuz.
@@ -67,6 +80,10 @@ To ensure maximum compatibility and avoid namespace conflicts, it is recommended
 **Standard Hi-Res Download:**
 
     python -m qobuz_dl dl https://play.qobuz.com/album/qxjbxh1dc3xyb -q 27
+
+**Last.fm Playlist Import:**
+
+    python -m qobuz_dl dl https://www.last.fm/user/vitiko98/playlists/11887574
 
 **Ultimate Customization (No lyrics, no booklets, native language metadata):**
 

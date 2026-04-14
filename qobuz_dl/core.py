@@ -3,7 +3,6 @@ import os
 import sys
 
 import requests
-from bs4 import BeautifulSoup as bso
 from pathvalidate import sanitize_filename
 
 from qobuz_dl.bundle import Bundle
@@ -411,37 +410,39 @@ class QobuzDL:
             return
 
     def download_lastfm_pl(self, playlist_url):
-        try:
-            r = requests.get(playlist_url, timeout=10)
-        except requests.exceptions.RequestException as e:
-            logger.error(f"{RED}Playlist download failed: {e}")
-            return
-        soup = bso(r.content, "html.parser")
-        artists = [artist.text for artist in soup.select(ARTISTS_SELECTOR)]
-        titles = [title.text for title in soup.select(TITLE_SELECTOR)]
-
-        track_list = []
-        if len(artists) == len(titles) and artists:
-            track_list = [
-                artist + " " + title for artist, title in zip(artists, titles)
-            ]
-
-        if not track_list:
-            logger.info(f"{OFF}Nothing found")
+        from qobuz_dl.lastfm_parser import fetch_lastfm_playlist
+        
+        logger.info(f"{CYAN}[*] Last.fm URL detected! Initiating Last.fm integration...{OFF}")
+        
+        # Step 1: Extract textual list from Last.fm using our isolated parser
+        tracks_list = fetch_lastfm_playlist(playlist_url)
+        
+        if not tracks_list:
+            logger.info(f"{YELLOW}[!] Last.fm processing aborted (no tracks).{OFF}")
             return
 
-        pl_title = sanitize_filename(soup.select_one("h1").text)
+        # Extract an ID from the Last.fm URL to name the folder
+        pl_id = playlist_url.rstrip('/').split('/')[-1]
+        pl_title = sanitize_filename(f"LastFM_Playlist_{pl_id}")
         pl_directory = os.path.join(self.directory, pl_title)
+        
         logger.info(
-            f"{YELLOW}Downloading playlist: {pl_title} " f"({len(track_list)} tracks)"
+            f"{YELLOW}Downloading playlist: {pl_title} ({len(tracks_list)} tracks){RESET}"
         )
 
-        for i in track_list:
-            track_id = get_url_info(self.search_by_type(i, "track", 1, lucky=True)[0])[
-                1
-            ]
-            if track_id:
-                self.download_from_id(track_id, False, pl_directory)
+        # Step 2: Convert to Qobuz IDs using our new method in qopy.py
+        track_ids = self.client.get_track_ids_from_list(tracks_list)
+        
+        if not track_ids:
+            logger.info(f"{RED}[!] No matching tracks found on Qobuz. Aborting.{OFF}")
+            return
+
+        # Step 3: Send valid IDs to the downloader engine
+        for t_id in track_ids:
+            try:
+                self.download_from_id(t_id, False, pl_directory)
+            except Exception as e:
+                logger.error(f"{RED}[!] Failed to queue track ID {t_id}: {e}{OFF}")
 
         if not self.no_m3u_for_playlists:
             make_m3u(pl_directory)

@@ -359,11 +359,86 @@ class Client:
             offset += 500
 
     # --- METADATA FUNCTIONS (Do not delete!) ---
-    def get_album_meta(self, id): 
-        return self.api_call("album/get", id=id)
-        
     def get_track_meta(self, id): 
         return self.api_call("track/get", id=id)
+
+    # --- NEW LAST.FM FUNCTIONS ---
+    def get_track_ids_from_list(self, tracks_list: list) -> list:
+        from qobuz_dl.color import OFF, GREEN, RED, YELLOW, CYAN
+        import difflib
+        
+        print(f"{CYAN}[*] Matching Last.fm tracks with Qobuz database (Fuzzy matching & Interactive mode enabled)...{OFF}")
+        valid_track_ids = []
+        
+        # Le nostre due soglie intelligenti
+        AUTO_ACCEPT_THRESHOLD = 0.75 
+        PROMPT_THRESHOLD = 0.60      
+        
+        for item in tracks_list:
+            target_artist = item['artist'].lower()
+            target_title = item['title'].lower()
+            query = f"{item['artist']} {item['title']}"
+            
+            try:
+                search_results = self.search_tracks(query, limit=5)
+                
+                best_match_id = None
+                best_match_name = ""
+                highest_ratio = 0.0
+                
+                if search_results and "tracks" in search_results and search_results["tracks"]["items"]:
+                    for q_track in search_results["tracks"]["items"]:
+                        # Estrazione sicura dei nomi
+                        q_artist_raw = q_track.get("performer", {}).get("name", "Unknown")
+                        q_title_raw = q_track.get("title", "Unknown")
+                        
+                        q_artist = q_artist_raw.lower()
+                        q_title = q_title_raw.lower()
+                        
+                        target_str = f"{target_artist} {target_title}"
+                        q_str = f"{q_artist} {q_title}"
+                        
+                        ratio = difflib.SequenceMatcher(None, target_str, q_str).ratio()
+                        
+                        if ratio > highest_ratio:
+                            highest_ratio = ratio
+                            best_match_id = q_track["id"]
+                            # Salviamo il nome originale (con le maiuscole giuste) per stamparlo bene a schermo
+                            best_match_name = f"{q_artist_raw} - {q_title_raw}"
+                    
+                    # --- LA LOGICA A 3 VIE ---
+                    
+                    # 1. Match Perfetto (Verde)
+                    if highest_ratio >= AUTO_ACCEPT_THRESHOLD and best_match_id:
+                        valid_track_ids.append(best_match_id)
+                        
+                    # 2. La Zona Grigia (Giallo / Input Utente)
+                    elif highest_ratio >= PROMPT_THRESHOLD and best_match_id:
+                        print(f"\n{YELLOW}[?] Borderline match detected ({highest_ratio*100:.0f}% similarity){OFF}")
+                        print(f"    Target (Last.fm): {item['artist']} - {item['title']}")
+                        print(f"    Found  (Qobuz)  : {best_match_name}")
+                        
+                        # Mette in pausa il programma e aspetta la tua risposta
+                        choice = input(f"{CYAN}    Do you want to download this track anyway? [y/n]: {OFF}").strip().lower()
+                        
+                        if choice == 'y':
+                            valid_track_ids.append(best_match_id)
+                            print(f"{GREEN}    [+] Track accepted manually.{OFF}")
+                        else:
+                            print(f"{RED}    [-] Track skipped manually.{OFF}")
+                            
+                    # 3. Scarto Sicuro (Rosso)
+                    else:
+                        print(f"{YELLOW}[!] Skipping: '{query}' (Best match was only {highest_ratio*100:.0f}% similar){OFF}")
+                        
+                else:
+                    print(f"{YELLOW}[!] Skipping (No results on Qobuz for): '{query}'{OFF}")
+                    
+            except Exception as e:
+                print(f"{RED}[!] Error searching for '{query}': {e}{OFF}")
+                
+        print(f"\n{GREEN}[+] Successfully matched {len(valid_track_ids)} out of {len(tracks_list)} tracks!{OFF}")
+        return valid_track_ids
 
     # --- SEARCH FUNCTIONS (Crash-Proof) ---
     def search_albums(self, query, limit=20):
