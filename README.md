@@ -42,6 +42,16 @@ Track names often differ slightly between platforms (e.g., missing "Remastered" 
 python -m qobuz_dl dl [https://www.last.fm/user/](https://www.last.fm/user/)<your_profile>/playlists/<playlist_id>
 ```
 
+## 📦 Pre-built Binaries (Releases)
+
+**For Windows x64 (10/11):**
+👉 **[Download the latest ZIP here](https://github.com/Sei969/qobuz-dl/releases/latest)**
+* **Portable:** No installation required.
+* **Important:** Just extract the `.zip` and make sure `ffmpeg.exe` and `qobuz-dl-ultimate.exe` are in the same folder.
+
+**For Linux / macOS:**
+* Please run the application from source using Python (see the **Getting Started** section below).
+
 ## 📥 Getting Started
 
 > You'll need an **active subscription** to Qobuz.
