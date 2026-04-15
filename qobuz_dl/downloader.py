@@ -41,11 +41,26 @@ def process_folder_format_with_subdirs(folder_format, attr_dict, path=None):
             try:
                 formatted_part = part.format(**attr_dict)
                 cleaned_part = sanitize_filepath(clean_filename(formatted_part), replacement_text="_")
+                
+                # --- FIX: SMART TRUNCATION FOR ALBUM FOLDER ---
+                # Truncate exceptionally long folder names to prevent path length errors in third-party apps
+                if cleaned_part and len(cleaned_part) > 120:
+                    start_f = cleaned_part[:60].rstrip(' ."-_\'')
+                    end_f = cleaned_part[-50:].lstrip(' ."-_\'')
+                    cleaned_part = f"{start_f}...{end_f}"
+                    
                 if cleaned_part:
                     cleaned_parts.append(cleaned_part)
             except KeyError as e:
                 logger.warning(f"{YELLOW}Format error ({e}), using original text.{OFF}")
                 cleaned_part = sanitize_filepath(clean_filename(part), replacement_text="_")
+                
+                # Apply truncation to the fallback as well
+                if cleaned_part and len(cleaned_part) > 120:
+                    start_f = cleaned_part[:60].rstrip(' ."-_\'')
+                    end_f = cleaned_part[-50:].lstrip(' ."-_\'')
+                    cleaned_part = f"{start_f}...{end_f}"
+                    
                 if cleaned_part:
                     cleaned_parts.append(cleaned_part)
     
@@ -404,11 +419,23 @@ class Download:
         )
 
         if multiple and self.settings.multiple_disc_one_dir:
-            formatted_path = sanitize_filename(clean_filename(self.settings.multiple_disc_track_format.format(**filename_attr)),
-                                               replacement_text="_")
+            formatted_path = sanitize_filename(clean_filename(self.settings.multiple_disc_track_format.format(**filename_attr)), replacement_text="_")
         else:
             formatted_path = sanitize_filename(clean_filename(self.track_format.format(**filename_attr)), replacement_text="_")
-        final_file = os.path.join(root_dir, formatted_path)[:250] + extension
+            
+        # --- FIX: SMART TRUNCATION (RISOLUZIONE DEFINITIVA) ---
+        # Sganciamo il calcolo dalla cartella. Un singolo nome file può arrivare a 255 caratteri.
+        # Fissiamo un limite iper-sicuro di 180 caratteri totali per la traccia.
+        max_len = 180
+        
+        if len(formatted_path) > max_len:
+            # Conserva i primi 110 caratteri e gli ultimi 60.
+            # .rstrip() e .lstrip() ripuliscono istantaneamente apici, trattini o spazi tagliati a metà.
+            inizio = formatted_path[:110].rstrip(' ."-_\'')
+            fine = formatted_path[-60:].lstrip(' ."-_\'')
+            formatted_path = f"{inizio}...{fine}"
+            
+        final_file = os.path.join(root_dir, formatted_path) + extension
 
         if os.path.exists(final_file):
             try:
