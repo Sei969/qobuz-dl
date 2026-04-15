@@ -38,9 +38,6 @@ class QobuzDLSettings:
         self.no_upc_tag = kwargs.get('no_upc_tag', False)
         self.no_isrc_tag = kwargs.get('no_isrc_tag', False)
 
-        # FLAC auto-fix Unset MD5s option
-        self.fix_md5s = kwargs.get('fix_md5s', False)
-
         # cover options
         self.embed_art = kwargs.get('embed_art', False)
         self.cover_og_quality = kwargs.get('og_cover', False)
@@ -102,10 +99,7 @@ class QobuzDLSettings:
             'multiple_disc_prefix': arguments.multiple_disc_prefix or config.get("DEFAULT", "multiple_disc_prefix", fallback="CD"),
             'multiple_disc_one_dir': arguments.multiple_disc_one_dir or config.getboolean("DEFAULT", "multiple_disc_one_dir", fallback=False),
             'multiple_disc_track_format': arguments.multiple_disc_track_format or config.get("DEFAULT", "multiple_disc_track_format", fallback="{disc_number}.{track_number} - {track_title}"),
-            
-            # FLAC auto-fix Unset MD5s option
-            'fix_md5s': arguments.fix_md5s or config.getboolean("DEFAULT", "fix_md5s", fallback=False),
-            
+                                 
             # tag options
             'no_album_artist_tag': arguments.no_album_artist_tag or config.getboolean("DEFAULT", "no_album_artist_tag", fallback=False),
             'no_album_title_tag': arguments.no_album_title_tag or config.getboolean("DEFAULT", "no_album_title_tag", fallback=False),

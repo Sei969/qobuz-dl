@@ -6,7 +6,8 @@ from mutagen.flac import FLAC, Picture
 import mutagen.id3 as id3
 from mutagen.id3 import ID3NoHeaderError
 from qobuz_dl.settings import QobuzDLSettings
-from qobuz_dl.utils import get_album_artist, flac_fix_md5s
+# Rimosso flac_fix_md5s da qui
+from qobuz_dl.utils import get_album_artist
 
 logger = logging.getLogger(__name__)
 
@@ -137,15 +138,6 @@ def tag_flac(
 ):
     """
     Tag a FLAC file
-
-    :param str filename: FLAC file path
-    :param str root_dir: Root dir used to get the cover art
-    :param str final_name: Final name of the FLAC file (complete path)
-    :param dict d: Track dictionary from Qobuz_client
-    :param dict album: Album dictionary from Qobuz_client
-    :param bool istrack: Whether the download URL is a link to a track or not.
-    :param bool em_image: Embed cover art into file
-    :param QobuzDLSettings settings: QobuzDL settings
     """
     audio = FLAC(filename)
 
@@ -179,22 +171,12 @@ def tag_flac(
 
     audio.save()
     os.rename(filename, final_name)
-    if settings.fix_md5s:
-        flac_fix_md5s(final_name)
+    # Rimosso il blocco settings.fix_md5s che causava il crash
 
 
 def tag_mp3(filename, root_dir, final_name, d, album, istrack=True, em_image=False, settings: QobuzDLSettings = None):
     """
     Tag an mp3 file
-
-    :param str filename: mp3 temporary file path
-    :param str root_dir: Root dir used to get the cover art
-    :param str final_name: Final name of the mp3 file (complete path)
-    :param dict d: Track dictionary from Qobuz_client
-    :param dict album: Album dictionary from Qobuz_client
-    :param bool istrack: Whether the download URL is a link to a track or not.
-    :param bool em_image: Embed cover art into file
-    :param QobuzDLSettings settings: QobuzDL settings
     """
 
     try:
@@ -236,9 +218,6 @@ def tag_mp3(filename, root_dir, final_name, d, album, istrack=True, em_image=Fal
 def _get_tags_to_add(qobuz_album: dict, qobuz_item : dict, settings: QobuzDLSettings = None):
     """
     get tags data from album and track metadata
-    :param dict qobuz_album: Qobuz album
-    :param dict qobuz_item: Qobuz item
-    :param QobuzDLSettings settings: QobuzDL settings
     """
     tags = dict()
     if not qobuz_album or not qobuz_item:

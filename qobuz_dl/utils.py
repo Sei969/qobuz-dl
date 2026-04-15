@@ -285,33 +285,3 @@ def invalid_chars_to_fullwidth(filename):
     for invalid_char, fullwidth_char in invalid_to_fullwidth.items():
         filename = filename.replace(invalid_char, fullwidth_char)
     return filename
-
-
-def _run_cmd(command):
-    process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    stdout, stderr = process.communicate()
-    return process.returncode, stdout, stderr
-
-def flac_fix_md5s(flac_file_path: str) -> bool:
-    """
-    Fix the MD5s of FLAC files by re-encoding them with the -sf8 option.
-    :param flac_file_path: Path to the FLAC file.
-    :return: True if successful, False otherwise
-    """
-    if not os.path.isfile(flac_file_path):
-        logger.error(f"File not found: {flac_file_path}")
-        return False
-        
-    logger.info(f"Fixing MD5s in {flac_file_path}")
-    md5sum_cmd = f'flac -sf8 "{flac_file_path}"'
-    logger.debug(f"Running command: {md5sum_cmd}")
-    
-    returncode, stdout, stderr = _run_cmd(md5sum_cmd)
-    if returncode == 0:
-        if stderr.strip():
-            logger.warning(stderr.strip())
-        return True
-    else:
-        logger.error(f'Error: md5sum command failed with return code {returncode}')
-        logger.error(f'Error: {stderr.strip()}')
-        return False
