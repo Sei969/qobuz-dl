@@ -93,7 +93,7 @@ usage: python -m qobuz_dl dl [-h] [-d PATH] [-q int] [--albums-only] [--no-m3u] 
 * **Human-like Delay (`--delay SECONDS`):** Forces a pause (in seconds) between track downloads to prevent IP bans or rate limits. Using this flag automatically disables multithreading and restores the sequential animated progress bars in the terminal.
 * **Advanced Folder Formatting (`-ff`):** `{album_artist}`, `{album_title}`, `{year}`, `{barcode}`, `{album_genre}`, `{label}`, `{upc}`, `{release_date}`, `{media_type}`, `{format}`, `{bit_depth}`, `{sampling_rate}`, `{disc_count}`, `{track_count}`.
 * **Advanced Track Formatting (`-tf`):** `{track_number}`, `{track_title}`, `{track_artist}`, `{track_composer}`, `{isrc}`, `{disc_number}`.
-* **Explicit Tag (`{explicit}` or `{ExplicitFlag}`):** Automatically adds an `[E]` tag if the track or album is marked with a parental advisory warning on Qobuz. If the content is clean, the variable remains empty without leaving unwanted trailing spaces.
+* **Explicit Tag (`{explicit}` or `{ExplicitFlag}`):** Automatically adds an `[E]` tag if the track or album is marked with a parental advisory warning on Qobuz. If the content is clean, the variable remains empty without leaving unwanted trailing spaces. **You can apply this permanently by adding the variables to your `config.ini` file, or temporarily via CLI using the `-ff` and `-tf` flags.**
   * *Folder Example:* `folder_format = {artist} - {album} {ExplicitFlag}` ➔ `Eminem - The Eminem Show [E]`
   * *Track Example:* `track_format = {track_number} - {tracktitle} {ExplicitFlag}` ➔ `02 - Without Me [E].flac`
 
