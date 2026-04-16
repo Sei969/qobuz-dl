@@ -106,6 +106,8 @@ class Download:
         no_credits: bool = False,
         settings: QobuzDLSettings = None,
         download_db=None,
+        is_playlist: bool = False,           # <-- NEW
+        playlist_track_number: int = None,   # <-- NEW
     ):
         self.client = client
         self.item_id = item_id
@@ -126,6 +128,9 @@ class Download:
 
         self.settings = settings or QobuzDLSettings()
         self.download_db = download_db
+        
+        self.is_playlist = is_playlist                       # <-- NEW
+        self.playlist_track_number = playlist_track_number   # <-- NEW
         
         self._original_folder_format = folder_format or DEFAULT_FOLDER
         self._original_track_format = track_format or DEFAULT_TRACK
@@ -264,6 +269,12 @@ class Download:
         parse = self.client.get_track_url(self.item_id, self.quality)
         if "sample" not in parse and parse["sampling_rate"]:
             track_meta = self.client.get_track_meta(self.item_id)
+            
+            # --- START PLAYLIST FIX: OVERRIDE TRACK NUMBER ---
+            if getattr(self, 'is_playlist', False) and getattr(self, 'playlist_track_number', None):
+                track_meta["track_number"] = self.playlist_track_number
+            # -------------------------------------------------
+            
             track_title = _get_title(track_meta)
             artist = _safe_get(track_meta, "performer", "name")
             logger.info(f"\n{YELLOW}Downloading: {artist} - {track_title}{OFF}")
@@ -288,16 +299,29 @@ class Download:
             dirn = process_folder_format_with_subdirs(self.folder_format, track_attr, self.path)
             os.makedirs(dirn, exist_ok=True)
 
-            if self.settings.no_cover:
+            # --- START PLAYLIST COVER FIX ---
+            if getattr(self, 'is_playlist', False):
+                # Skip saving the generic cover.jpg to avoid cluttering the folder with 50 different images
+                logger.info(f"{OFF}Skipping standard cover save to keep playlist folder clean")
+            elif self.settings.no_cover:
                 logger.info(f"{OFF}Skipping cover")
             else:
                 _get_extra(track_meta["album"]["image"]["large"], dirn, art_size=self.settings.saved_art_size)
 
             if self.settings.embed_art:
+                # Force remove previous embedded cover to prevent caching issues across tracks
+                embed_path = os.path.join(dirn, EMB_COVER_NAME)
+                if os.path.exists(embed_path):
+                    try:
+                        os.remove(embed_path)
+                    except OSError:
+                        pass
+                
                 _get_extra(track_meta["album"]["image"]["large"], dirn, extra=EMB_COVER_NAME,
                            art_size=self.settings.embedded_art_size)
             else:
                 logger.info(f"{OFF}Skipping embedded art")
+            # --- END PLAYLIST COVER FIX ---
                 
             is_mp3 = True if int(self.quality) == 5 else False
             

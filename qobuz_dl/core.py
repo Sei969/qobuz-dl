@@ -100,7 +100,7 @@ class QobuzDL:
             secret for secret in bundle.get_secrets().values() if secret
         ]  
 
-    def download_from_id(self, item_id, album=True, alt_path=None):
+    def download_from_id(self, item_id, album=True, alt_path=None, is_playlist=False, playlist_index=None):
         if handle_download_id(self.downloads_db, item_id, add_id=False, quality=self.quality):
             logger.info(
                 f"{OFF}This release ID ({item_id}) was already downloaded "
@@ -126,6 +126,8 @@ class QobuzDL:
                 self.no_credits, 
                 self.settings,
                 self.downloads_db,
+                is_playlist=is_playlist,
+                playlist_track_number=playlist_index
             )
             dloader.download_id_by_type(not album)
         except (requests.exceptions.RequestException, NonStreamable) as e:
@@ -184,12 +186,33 @@ class QobuzDL:
                 ]
 
             logger.info(f"{YELLOW}{len(items)} downloads in queue")
-            for item in items:
+            
+            # --- START PLAYLIST LOGIC (Flat Folder) ---
+            is_playlist = (url_type == "playlist")
+            if is_playlist:
+                original_folder_format = self.folder_format
+                original_multi_disc_setting = self.settings.multiple_disc_one_dir
+                
+                self.folder_format = "."
+                self.settings.multiple_disc_one_dir = True
+            # ------------------------------------------------
+
+            # Usiamo enumerate per avere il numero della traccia nella playlist (1, 2, 3...)
+            for idx, item in enumerate(items, start=1):
                 self.download_from_id(
                     item["id"],
                     True if type_dict["iterable_key"] == "albums" else False,
                     new_path,
+                    is_playlist=is_playlist,
+                    playlist_index=idx
                 )
+
+            # --- RESTORE SETTINGS ---
+            if is_playlist:
+                self.folder_format = original_folder_format
+                self.settings.multiple_disc_one_dir = original_multi_disc_setting
+            # -------------------------------
+
             if url_type == "playlist" and not self.no_m3u_for_playlists:
                 make_m3u(new_path)
         else:
@@ -456,9 +479,16 @@ class QobuzDL:
         self.folder_format = "."
         self.settings.multiple_disc_one_dir = True
         
-        for t_id in track_ids:
+        # Use enumerate to get the playlist track number (1, 2, 3...)
+        for idx, t_id in enumerate(track_ids, start=1):
             try:
-                self.download_from_id(t_id, False, pl_directory)
+                self.download_from_id(
+                    t_id, 
+                    False, 
+                    pl_directory, 
+                    is_playlist=True, 
+                    playlist_index=idx
+                )
             except Exception as e:
                 logger.error(f"{RED}[!] Failed to queue track ID {t_id}: {e}{OFF}")
 
