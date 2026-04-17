@@ -11,6 +11,7 @@ Search, explore, and download Lossless and Hi-Res music from [Qobuz](https://www
 ### 🎧 Audiophile & Metadata Engine
 * **Roon & DAP Optimized:** Metadata, cover art, and lyrics are meticulously formatted to ensure perfect out-of-the-box integration with Roon servers and Digital Audio Players.
 * **Massive Tag Control:** Refactored tag engine supports highly detailed classical music metadata. Almost every single tag can be toggled on/off via CLI arguments.
+* **Native Multi-Artist Tagging:** Automatically detects and splits main artists and featured guests. Unlike standard downloaders, it writes discrete multiple tags for FLAC files (Vorbis Comments) and standard null-separated strings for MP3s (ID3v2), ensuring flawless interpretation by high-end players like Roon, Plexamp, or Kodi without requiring external tools like MusicBrainz Picard.
 * **Automatic Lyrics Engine:** Fetches and injects synchronized (`.lrc`) and unsynchronized lyrics using LRCLIB (with a Genius fallback API).
 * **Digital Booklets & Goodies:** Automatically compiles a `.txt` file with a complete tracklist, full credits, metadata, and reviews, while simultaneously downloading official PDF "Goodies" (Booklets).
 
