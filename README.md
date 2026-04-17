@@ -1,7 +1,7 @@
 # qobuz-dl Ultimate Edition
-![Docker Image CI](https://github.com/Sei969/qobuz-dl/actions/workflows/docker.yml/badge.svg)
-
 Search, explore, and download Lossless and Hi-Res music from [Qobuz](https://www.qobuz.com/).
+
+**This is an enhanced, feature-rich fork of the original qobuz-dl project, designed for the ultimate audiophile experience. It includes a resilient download engine, deep customization for keeping your library perfectly organized, and extensive, native support for classical music metadata.**
 
 ---
 
@@ -80,18 +80,6 @@ python -m qobuz_dl dl --sync-db "C:\My Music"
 ```bash
 python -m qobuz_dl fun -l 10
 ```
-
-### 🐳 Docker Usage (NAS & Home Servers)
-The Ultimate Edition is fully containerized and includes all dependencies (Python, FFmpeg). This is the recommended installation method for Synology, QNAP, Unraid, and headless servers.
-
-```bash
-# Pull the latest official image
-docker pull ghcr.io/Sei969/qobuz-dl:latest
-
-# Example: Run a download and map it to your NAS music folder
-docker run -it --rm \
-  -v /path/to/your/nas/music:/app/QobuzDownloads \
-  ghcr.io/Sei969/qobuz-dl:latest dl "https://play.qobuz.com/album/..."
 
 ---
 
