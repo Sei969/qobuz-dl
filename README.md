@@ -5,8 +5,6 @@ Search, explore, and download Lossless and Hi-Res music from [Qobuz](https://www
 
 **This is an enhanced, feature-rich fork of the original qobuz-dl project, designed for the ultimate audiophile experience. It includes a resilient download engine, deep customization for keeping your library perfectly organized, and extensive, native support for classical music metadata.**
 
----
-
 ## ✨ Features
 
 ### 🎧 Audiophile & Metadata Engine
@@ -16,11 +14,31 @@ Search, explore, and download Lossless and Hi-Res music from [Qobuz](https://www
 * **Digital Booklets & Goodies:** Automatically compiles a `.txt` file with a complete tracklist, full credits, metadata, and reviews, while simultaneously downloading official PDF "Goodies" (Booklets).
 
 ### 🚀 Resilient Download Engine
+* **Database Recovery & Sync:** Includes a specialized `--sync-db` engine to restore missing entries in your local database by scanning your existing music folders.
+* **Smart Reverse Lookup:** Automatically identifies legacy files by reading their **ISRC** or **UPC** tags and querying the Qobuz API to restore the correct IDs into the database.
 * **Segmented Download & Remuxing:** Bypasses Akamai CDN throttling with a high-speed segmented download engine and automatic FFmpeg remuxing.
 * **Multithreaded Downloading:** Concurrent track downloads for blazing-fast album fetching.
-* **Clean Multithreading UI:** Intelligently switches to a clutter-free, static logging system displaying precise file sizes (MB) during concurrent downloads, preserving the classic animated progress bars for sequential (`--delay`) downloads.
-* **Smart Quality Fallback:** Automatically downgrades to the next best available quality if the requested tier is restricted by the server.
-* **Database Recovery & Sync:** Includes a specialized `--sync-db` engine to restore missing entries in your local database by scanning your existing music folders. Automatically identifies legacy files by reading their **ISRC** or **UPC** tags.
+* **Clean Multithreading UI:** Intelligently switches to a clutter-free, static logging system displaying precise file sizes (MB) during concurrent downloads. This prevents terminal visual glitches and "cursor wars" with the Lyrics Engine, while preserving the classic animated progress bars for sequential (`--delay`) downloads.
+* **Smart Quality Fallback:** Automatically downgrades to the next best available quality if the requested tier is restricted by the server, ensuring your download queue never crashes.
+* **Authentication Bypass:** Log in securely using your browser's `user_auth_token` if standard password authentication is blocked. Graciously handles Free/Studio accounts.
+
+### 📁 Advanced Formatting & Storage
+
+Qobuz-DL Ultimate allows deep customization of your library structure using variables.
+
+* **True Playlist Support (Native):** Seamlessly handles Qobuz and Last.fm playlists with a specialized logic designed for library organization (Fixes #257).
+  * **Flat Folder Structure:** Automatically downloads all tracks into a single directory named after the playlist, preventing the creation of dozens of scattered album sub-folders.
+  * **Sequential Track Numbering:** Overrides original album track numbers with the playlist's actual order (`01`, `02`, `03`...), ensuring a perfect chronological playback experience.
+  * **Smart Cover Management:** Eliminates the "Cover Conflict" bug. The engine now dynamically manages embedded artwork, ensuring each track gets its correct unique cover without leaving duplicate `cover.jpg` files in the folder.
+* **Powerful Variables:** `folder_format` and `track_format` now support dozens of new variables (e.g., `{isrc}`, `{barcode}`, `{label}`, `{track_composer}`).
+* **Release Type (`{release_type}`):** Automatically identifies the publication category from Qobuz APIs (e.g., `Album`, `EP`, `Single`), allowing you to dynamically route downloads into subdirectories or use it as a naming prefix without enforcing a fixed structure.
+  * *Folder Example (Subdirectory):* `folder_format = {release_type}/{album_artist} - {album_title}` ➔ `Album/Daft Punk - Discovery`
+  * *Folder Example (Prefix):* `folder_format = {release_type} - {album_artist} - {album_title}` ➔ `Single - Gorillaz - Silent Running`
+* **Explicit Tag (`{explicit}` or `{ExplicitFlag}`):** Automatically adds an `[E]` tag if the track or album is marked with a parental advisory warning on Qobuz. If the content is clean, the variable remains empty without leaving unwanted trailing spaces. **You can apply this permanently by adding the variables to your `config.ini` file, or temporarily via CLI using the `-ff` and `-tf` flags.**
+  * *Folder Example:* `folder_format = {artist} - {album} {ExplicitFlag}` ➔ `Eminem - The Eminem Show [E]`
+  * *Track Example:* `track_format = {track_number} - {tracktitle} {ExplicitFlag}` ➔ `02 - Without Me [E].flac`
+* **Multi-Disc Routing:** Store multiple disc releases in one single directory or split them using customizable prefixes (e.g., `CD 01`).
+* **Universal Playlist Generation:** `.m3u` files are strictly UTF-8 encoded, ensuring 100% crash-free generation even with complex Unicode or Japanese characters (Fixes #304).
 
 ### 🌉 Last.fm Smart Integration & Interactive Mode
 Seamlessly bridge your Last.fm world with Qobuz. Download your personalized playlists and "Loved Tracks" with ease. 
@@ -28,8 +46,6 @@ To prevent downloading incorrect songs, this fork utilizes a mathematical **Fuzz
 * **Auto-Accept (> 75%):** Perfect matches are automatically queued.
 * **Auto-Skip (< 60%):** Completely wrong tracks are automatically skipped.
 * **Interactive Selection (60% - 74%):** For borderline matches, the engine pauses and activates an interactive prompt allowing you to manually approve or reject the track (`[y/n]`).
-
----
 
 ## 📥 Installation & Setup
 
@@ -61,12 +77,23 @@ docker pull ghcr.io/sei969/qobuz-dl:latest
 docker run -it --rm \
   -v /path/to/your/nas/music:/app/QobuzDownloads \
   ghcr.io/sei969/qobuz-dl:latest dl "[https://play.qobuz.com/album/](https://play.qobuz.com/album/)..."
-```
-
----
-
+  ```
 ## 💻 Usage & Quick Examples
 
+```text
+[Global Commands & Database Management]
+usage: python -m qobuz_dl [-h] [-r] [-p] [--sync-db [PATH]] [-sc] {interactive,i,fun,dl,lucky} ...
+
+[Download Usage]
+usage: python -m qobuz_dl dl [-h] [-d PATH] [-q int] [--albums-only] [--no-m3u] [--no-fallback] [--no-db] 
+                             [-ff PATTERN] [-tf PATTERN] [-s] [-e] [--no-cover]
+                             [--embedded-art-size {50,100,150,300,600,max,org}] 
+                             [--saved-art-size {50,100,150,300,600,max,org}] 
+                             [--multiple-disc-prefix PREFIX] [--multiple-disc-one-dir] 
+                             [--no-lyrics] [--native-lang] [--no-credits] [--delay SECONDS]
+                             [--no-album-artist-tag] [--no-track-composer-tag] ... 
+                             SOURCE [SOURCE ...]
+							 
 **Basic Album/Playlist Download:**
 ```bash
 python -m qobuz_dl dl [https://play.qobuz.com/album/qxjbxh1dc3xyb](https://play.qobuz.com/album/qxjbxh1dc3xyb)
@@ -94,38 +121,23 @@ python -m qobuz_dl dl --sync-db "C:\My Music"
 *(Tip: In interactive mode, use `Space` to multi-select several albums to download at once!)*
 ```bash
 python -m qobuz_dl fun -l 10
-```
+```							 
 
----
+### 🛠️ Key Formatting Variables
 
-## 🛠️ Advanced Configuration & Formatting
-
-Qobuz-DL Ultimate allows deep customization of your library structure using variables. 
-
-### 📁 True Playlist Support
-Playlists are now handled natively (Fixes #257 & #304):
-* **Flat Folder Structure:** Downloads all tracks into a single directory named after the playlist.
-* **Sequential Track Numbering:** Overrides original album track numbers with the playlist's actual order (`01`, `02`, `03`...).
-* **Smart Cover Management:** Dynamically manages embedded artwork, ensuring each track gets its unique cover without leaving duplicate `cover.jpg` files.
-* **Universal .m3u:** Playlists are strictly UTF-8 encoded for 100% crash-free generation.
-
-### 🏷️ Formatting Variables
 You can customize your `config.ini` or use the CLI flags `-ff` (Folder Format) and `-tf` (Track Format) with these powerful variables:
 
-* **Folder Pattern (`-ff`):** `{release_type}`, `{album_artist}`, `{year}`, `{label}`, `{barcode}`.
-  * *Example:* `-ff "{release_type} / {artist} - {album}"` -> `EP / Måneskin - Rush`
-* **Track Pattern (`-tf`):** `{track_number}`, `{track_title}`, `{isrc}`, `{track_composer}`.
-* **Explicit Tag (`{explicit}` or `{ExplicitFlag}`):** Automatically adds an `[E]` tag for parental advisory content. 
-  * *Example:* `-ff "{artist} - {album} {ExplicitFlag}"` -> `Artist - Album [E]`
+* **Database Sync (`--sync-db [PATH]`):** Scans the specified directory to restore missing Qobuz IDs into your local database. If no path is provided, it uses the default download folder.
+* **Folder Pattern (`-ff`):** Supports dynamic routing with `{release_type}`, `{album_artist}`, `{year}`, `{label}`, and `{barcode}`.
+* **Track Pattern (`-tf`):** Customize filenames using `{track_number}`, `{track_title}`, `{isrc}`, and `{track_composer}`.
+* **Explicit Flag:** Use `{ExplicitFlag}` or `{explicit}` within your patterns to automatically mark parental advisory content.
 
-*(Run `python -m qobuz_dl dl -h` to see the complete list of available CLI arguments and toggles).*
-
----
+*Detailed variable usage and examples can be found in the [Advanced Formatting & Storage](#-advanced-formatting--storage) section.*
 
 ## 🏆 Credits
-* **[vitiko98](https://github.com/vitiko98/qobuz-dl)**: Creator of the original project. A huge thanks for laying the foundation of this amazing tool.
-* **[xwell](https://github.com/xwell/qobuz-dl)**: For the massive tag refactoring, customizable metadata engine, dynamic formatting variables, and "Goodies" integration.
-* **[catap](https://github.com/catap)**: For the segmented download patch, which bypasses the Akamai CDN throttling.
+* **[vitiko98](https://github.com/vitiko98/qobuz-dl)**: Creator of the original project.
+* **[xwell](https://github.com/xwell/qobuz-dl)**: For the massive tag refactoring and "Goodies" integration.
+* **[catap](https://github.com/catap)**: For the segmented download patch.
 
 ## ⚠️ Disclaimer
 * This tool was written for educational purposes.
