@@ -268,6 +268,21 @@ def main():
         sys.exit(f"\n{GREEN}Database synchronization finished successfully.{OFF}")
     # ----------------------------------------------
 
+    # --- RETRO LYRICS FEATURE (Standalone Mode) ---
+    # Intercettiamo il comando qui prima che QobuzDLSettings cerchi 'directory' mandando in crash il programma
+    if arguments.command == "lyrics":
+        from qobuz_dl.retro_tagger import inject_lyrics_retroactively
+        
+        target_dir = arguments.DIR
+        if os.name == "nt":
+            target_dir = os.path.abspath(target_dir)
+            if not target_dir.startswith("\\\\?\\"):
+                target_dir = "\\\\?\\" + target_dir
+                
+        inject_lyrics_retroactively(target_dir, genius_token=genius_token)
+        sys.exit(0)
+    # ----------------------------------------------
+
     directory_to_use = arguments.directory if hasattr(arguments, 'directory') and arguments.directory else default_folder
 
     # --- WINDOWS LONG PATH BYPASS ---

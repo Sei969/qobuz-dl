@@ -276,6 +276,11 @@ class Download:
             
         _clean_embed_art(dirn, self.settings)
         
+        # --- NEW: APPEND LYRICS TO BOOKLET ---
+        if getattr(self, 'fetch_lyrics', False) and not self.no_credits:
+            self._append_lyrics_to_booklet(dirn, album_title)
+        # -------------------------------------
+        
         handle_download_id(db_path=self.download_db, item_id=self.item_id, add_id=True, media_type="album",
                            quality=self.quality, file_format=file_format, quality_met=quality_met,
                            bit_depth=bit_depth, sampling_rate=sampling_rate, saved_path=dirn,
@@ -782,6 +787,77 @@ class Download:
         except Exception as e:
             safe_print(f"{RED}[!] Error creating booklet: {e}{OFF}")
 
+    def _append_lyrics_to_booklet(self, dirn, album_title):
+        import re
+        
+        safe_title = sanitize_filename(album_title)
+        tracklist_path = os.path.join(dirn, f"{safe_title} - Tracklist.txt")
+        
+        # Abort if the booklet does not exist
+        if not os.path.isfile(tracklist_path):
+            return
+            
+        # Find all audio files recursively (supports multi-disc subfolders)
+        audio_files = []
+        for root, _, files in os.walk(dirn):
+            for f in files:
+                if f.lower().endswith(('.flac', '.mp3')):
+                    audio_files.append(os.path.join(root, f))
+                    
+        # Alphabetical order respects track order (CD 01, CD 02, etc. and 01, 02 track nums)
+        audio_files.sort()
+        lyrics_to_append = []
+        
+        for audio_path in audio_files:
+            # Estrarre il percorso base (senza estensione) per trovare i file testo
+            base_path = os.path.splitext(audio_path)[0]
+            lrc_path = f"{base_path}.lrc"
+            txt_path = f"{base_path}.txt" 
+            base_name = os.path.basename(base_path)
+            
+            lyrics_text = ""
+            
+            # Case 1: Synchronized Lyrics (.lrc)
+            if os.path.exists(lrc_path):
+                with open(lrc_path, "r", encoding="utf-8") as f:
+                    raw_lyrics = f.read()
+                    
+                # A. Strip Metadata Tags (e.g., [ti:Title], [ar:Artist])
+                clean_lyrics = re.sub(r'\[[a-zA-Z]+:.*?\]\n?', '', raw_lyrics)
+                # B. Strip exact Timings (e.g., [00:12.34] or [00:12.345])
+                clean_lyrics = re.sub(r'\[\d{2,}:\d{2}\.\d{2,3}\]', '', clean_lyrics)
+                
+                # C. Smart line break cleanup (keeps paragraphs/stanzas, removes multiple blank lines)
+                clean_lines = []
+                for line in clean_lyrics.splitlines():
+                    stripped = line.strip()
+                    if stripped:
+                        clean_lines.append(stripped)
+                    elif clean_lines and clean_lines[-1] != "":
+                        clean_lines.append("")
+                
+                lyrics_text = "\n".join(clean_lines).strip()
+                
+            # Case 2: Fallback to Unsynchronized Lyrics (.txt), ignoring the booklet itself
+            elif os.path.exists(txt_path) and "Tracklist" not in txt_path:
+                with open(txt_path, "r", encoding="utf-8") as f:
+                    lyrics_text = f.read().strip()
+                    
+            if lyrics_text:
+                lyrics_to_append.append(f"--- {base_name} ---\n\n{lyrics_text}\n\n")
+                
+        # If at least one lyric text was found, open the booklet in append mode ("a")
+        if lyrics_to_append:
+            try:
+                with open(tracklist_path, "a", encoding="utf-8") as f:
+                    f.write("\n" + "=" * 70 + "\n")
+                    f.write("ALBUM LYRICS\n")
+                    f.write("=" * 70 + "\n\n")
+                    for l in lyrics_to_append:
+                        f.write(l)
+                safe_print(f"{CYAN}[+] Lyrics cleanly formatted and appended to Digital Booklet.{OFF}")
+            except Exception as e:
+                logger.error(f"{RED}[!] Error appending lyrics to booklet: {e}{OFF}")
 
 def _get_description(item: dict, track_title, multiple=None):
     downloading_title = f"{track_title} [{item.get('bit_depth', '')}/{item.get('sampling_rate', '')}]"

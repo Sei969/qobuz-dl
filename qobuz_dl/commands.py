@@ -56,6 +56,18 @@ def dl_args(subparsers):
     )
     return download
 
+def lyrics_args(subparsers):
+    lyrics = subparsers.add_parser(
+        "lyrics",
+        description="Retroactively scan a directory and inject missing lyrics into existing audio files.",
+        help="lyrics injection mode",
+    )
+    lyrics.add_argument(
+        "DIR",
+        metavar="DIRECTORY",
+        help="The local directory containing the music files to be scanned",
+    )
+    return lyrics
 
 def add_common_arg(custom_parser, default_folder, default_quality):
     custom_parser.add_argument(
@@ -355,6 +367,10 @@ def qobuz_dl_args(
     interactive = fun_args(subparsers, default_limit)
     download = dl_args(subparsers)
     lucky = lucky_args(subparsers)
+    
+    # Inizializza il nuovo comando
+    lyrics_cmd = lyrics_args(subparsers)
+    
     [
         add_common_arg(i, default_folder, default_quality)
         for i in (interactive, download, lucky)

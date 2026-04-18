@@ -12,8 +12,8 @@ Search, explore, and download Lossless and Hi-Res music from [Qobuz](https://www
 * **Roon & DAP Optimized:** Metadata, cover art, and lyrics are meticulously formatted to ensure perfect out-of-the-box integration with Roon servers and Digital Audio Players.
 * **Massive Tag Control:** Refactored tag engine supports highly detailed classical music metadata. Almost every single tag can be toggled on/off via CLI arguments.
 * **Native Multi-Artist Tagging:** Automatically detects and splits main artists and featured guests. Unlike standard downloaders, it writes discrete multiple tags for FLAC files (Vorbis Comments) and standard null-separated strings for MP3s (ID3v2), ensuring flawless interpretation by high-end players like Roon, Plexamp, or Kodi without requiring external tools like MusicBrainz Picard.
-* **Automatic Lyrics Engine:** Fetches and injects synchronized (`.lrc`) and unsynchronized lyrics using LRCLIB (with a Genius fallback API).
-* **Digital Booklets & Goodies:** Automatically compiles a `.txt` file with a complete tracklist, full credits, metadata, and reviews, while simultaneously downloading official PDF "Goodies" (Booklets).
+* **Automatic Lyrics Engine & Retroactive Tagger:** Fetches and injects synchronized (`.lrc`) and unsynchronized lyrics using LRCLIB (with a Genius fallback API). Includes a standalone `lyrics` command to retroactively scan and inject missing lyrics into your existing local library without re-downloading the audio.
+* **Enhanced Digital Booklets:** Automatically compiles a beautifully formatted `.txt` file with a complete tracklist, runtime, full credits, metadata, and reviews. Upon completion, the engine intelligently sweeps the folder, strips timestamps from `.lrc` files, and appends the pure text lyrics of the entire album directly into the booklet. Official PDF "Goodies" are also downloaded alongside it.
 
 ### 🚀 Resilient Download Engine
 * **Database Recovery & Sync:** Includes a specialized `--sync-db` engine to restore missing entries in your local database by scanning your existing music folders.
@@ -65,7 +65,7 @@ The easiest way to run the program on Windows without installing Python.
 ### Option B: Python Source (Linux, macOS, Windows)
 Clone this repository and install the required dependencies:
 ```bash
-git clone [https://github.com/Sei969/qobuz-dl.git](https://github.com/Sei969/qobuz-dl.git)
+git clone https://github.com/Sei969/qobuz-dl.git
 cd qobuz-dl
 pip3 install -r requirements.txt
 ```
@@ -80,7 +80,7 @@ docker pull ghcr.io/sei969/qobuz-dl:latest
 # Example: Run a download and map it to your NAS music folder
 docker run -it --rm \
   -v /path/to/your/nas/music:/app/QobuzDownloads \
-  ghcr.io/sei969/qobuz-dl:latest dl "[https://play.qobuz.com/album/](https://play.qobuz.com/album/)..."
+  ghcr.io/sei969/qobuz-dl:latest dl "https://play.qobuz.com/album/..."
 ```
 
 ### Option D: ☁️ Google Colab (Cloud & Google Drive)
@@ -90,11 +90,12 @@ The fastest way to download directly to your Google Drive at Gigabit speeds, byp
 
 * **Zero Setup:** Runs entirely in your browser (works seamlessly on smartphones and tablets too).
 * **Usage:** Click the badge above, run the setup cells to mount your Google Drive, paste your Qobuz Auth Token, and start downloading directly to the cloud.
+
 ## 💻 Usage & Quick Examples
 
 ```text
 [Global Commands & Database Management]
-usage: python -m qobuz_dl [-h] [-r] [-p] [--sync-db [PATH]] [-sc] {interactive,i,fun,dl,lucky} ...
+usage: python -m qobuz_dl [-h] [-r] [-p] [--sync-db [PATH]] [-sc] {interactive,i,fun,dl,lucky,lyrics} ...
 
 [Download Usage]
 usage: python -m qobuz_dl dl [-h] [-d PATH] [-q int] [--albums-only] [--no-m3u] [--no-fallback] [--no-db] 
@@ -105,10 +106,11 @@ usage: python -m qobuz_dl dl [-h] [-d PATH] [-q int] [--albums-only] [--no-m3u] 
                              [--no-lyrics] [--native-lang] [--no-credits] [--delay SECONDS]
                              [--no-album-artist-tag] [--no-track-composer-tag] ... 
                              SOURCE [SOURCE ...]
+```
 							 
 **Basic Album/Playlist Download:**
 ```bash
-python -m qobuz_dl dl [https://play.qobuz.com/album/qxjbxh1dc3xyb](https://play.qobuz.com/album/qxjbxh1dc3xyb)
+python -m qobuz_dl dl https://play.qobuz.com/album/qxjbxh1dc3xyb
 ```
 
 **Safe Download (Anti-Ban):**
@@ -120,13 +122,7 @@ python -m qobuz_dl dl <URL> --delay 1
 **Advanced Discography Routing:**
 Save multiple discs of a release in one single folder instead of splitting them.
 ```bash
-python -m qobuz_dl dl [https://play.qobuz.com/artist/2038380](https://play.qobuz.com/artist/2038380) --multiple-disc-one-dir
-```
-
-**Database Sync:**
-Scans the specified directory to restore missing Qobuz IDs into your local database. (Uses default download folder if no path is provided).
-```bash
-python -m qobuz_dl dl --sync-db "C:\My Music"
+python -m qobuz_dl dl https://play.qobuz.com/artist/2038380 --multiple-disc-one-dir
 ```
 
 **Interactive Last.fm Mode (Fun Mode):**
@@ -135,18 +131,24 @@ python -m qobuz_dl dl --sync-db "C:\My Music"
 python -m qobuz_dl fun -l 10
 ```
 
-### 🗄️ Database Management & Smart Sync
-The Ultimate Edition includes a powerful local database to keep track of your downloads and completely prevent duplicate downloads. 
+### 🗄️ Database & Library Management
+The Ultimate Edition includes powerful local library managers to keep track of your downloads, prevent duplicates, and retroactively fix your metadata.
 
 * **Smart Library Sync (`--sync-db`):**
-  Already have a local library of downloaded FLACs? You don't need to start from scratch. Run this command to perform a *Reverse Lookup* on your download directory. The engine will scan your existing files and automatically inject them into the local database. The next time you download a massive discography, the program will intelligently skip the albums you already own and only download the missing releases.
+  Already have a local library of downloaded FLACs? You don't need to start from scratch. Run this command to perform a *Reverse Lookup* on your download directory. The engine will scan your existing files and automatically inject them into the local database to prevent duplicate downloads in the future.
   ```bash
   python -m qobuz_dl --sync-db
   ```
-  *(Note: You can also specify a custom path to scan, e.g., `--sync-db /path/to/your/music`)*
+  *(Note: You can also specify a custom path to scan, e.g., `--sync-db "/path/to/your/music"`)*
+
+* **Retroactive Lyrics Tagger (`lyrics`):**
+  Do you have an existing local music library that lacks synced lyrics? The new `lyrics` command acts as a standalone metadata engine. It recursively scans any local directory, detects FLAC/MP3 files missing lyrics, and intelligently injects them into the audio files using LRCLIB (and Genius API) without re-downloading any music.
+  ```bash
+  python -m qobuz_dl lyrics "/path/to/your/local/music/folder"
+  ```
 
 * **Purge Database (`-p`, `--purge`):**
-  If you ever need to start fresh, clear your download history, or fix a corrupted state, you can instantly wipe the local database with a single command. No need to manually hunt for hidden system files.
+  If you ever need to start fresh, clear your download history, or fix a corrupted state, you can instantly wipe the local database with a single command.
   ```bash
   python -m qobuz_dl --purge
   ```
