@@ -292,6 +292,7 @@ class Download:
         if "sample" not in parse and parse["sampling_rate"]:
             track_meta = self.client.get_track_meta(self.item_id)
             
+            
             # --- START PLAYLIST FIX: OVERRIDE TRACK NUMBER ---
             if getattr(self, 'is_playlist', False) and getattr(self, 'playlist_track_number', None):
                 track_meta["track_number"] = self.playlist_track_number

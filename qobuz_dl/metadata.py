@@ -38,6 +38,9 @@ ID3_LEGEND = {
     # --- DB SYNC FEATURE: CUSTOM QOBUZ IDS ---
     "QOBUZTRACKID": id3.TXXX,
     "QOBUZALBUMID": id3.TXXX,
+    # --- REPLAYGAIN ---
+    "replaygain_track_gain": id3.TXXX,
+    "replaygain_track_peak": id3.TXXX,
 }
 
 EMB_COVER_NAME = "embed_cover.jpg"
@@ -174,7 +177,6 @@ def tag_flac(
 
     audio.save()
     os.rename(filename, final_name)
-    # Rimosso il blocco settings.fix_md5s che causava il crash
 
 
 def tag_mp3(filename, root_dir, final_name, d, album, istrack=True, em_image=False, settings: QobuzDLSettings = None):
@@ -200,11 +202,13 @@ def tag_mp3(filename, root_dir, final_name, d, album, istrack=True, em_image=Fal
     # write metadata in `tags` to file
     for k, v in tags.items():
         if v:
-            id3tag = ID3_LEGEND[k]
-            if id3tag == id3.TXXX:
-                audio.add(id3tag(encoding=3, desc=k, text=v))
-            else:
-                audio[id3tag.__name__] = id3tag(encoding=3, text=v)
+            # Fix compatibilità ID3_LEGEND minuscolo vs tags maiuscolo
+            id3tag = ID3_LEGEND.get(k.lower()) or ID3_LEGEND.get(k)
+            if id3tag:
+                if id3tag == id3.TXXX:
+                    audio.add(id3tag(encoding=3, desc=k, text=v))
+                else:
+                    audio[id3tag.__name__] = id3tag(encoding=3, text=v)
 
     # track information
     audio["TRCK"] = id3.TRCK(encoding=3,
@@ -283,6 +287,18 @@ def _get_tags_to_add(qobuz_album: dict, qobuz_item : dict, settings: QobuzDLSett
         tags["MEDIATYPE"] = qobuz_album.get("product_type", "").upper()
     if not settings.no_explicit_tag:
         tags["ITUNESADVISORY"] = "1" if qobuz_album.get("parental_warning", False) else "0"
+
+    # --- NEW: REPLAYGAIN TAGS ---
+    audio_info = qobuz_item.get("audio_info", {})
+    if audio_info:
+        rg_gain = audio_info.get("replaygain_track_gain")
+        rg_peak = audio_info.get("replaygain_track_peak")
+        
+        if rg_gain is not None:
+            tags["REPLAYGAIN_TRACK_GAIN"] = f"{rg_gain} dB"
+        if rg_peak is not None:
+            tags["REPLAYGAIN_TRACK_PEAK"] = str(rg_peak)
+    # ----------------------------
 
     # --- DB SYNC FEATURE: SAVE QOBUZ IDS ---
     # These invisible tags allow the sync tool to rebuild
