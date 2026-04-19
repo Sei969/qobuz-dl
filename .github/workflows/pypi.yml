@@ -1,16 +1,21 @@
 name: Publish to PyPI
 
-# L'azione scatta SOLO quando pubblichi una nuova Release su GitHub
 on:
   release:
     types: [published]
+  # Questo è il pulsante manuale per la nostra situazione
+  workflow_dispatch:
+    inputs:
+      manual_version:
+        description: 'Versione da forzare su PyPI (es. 1.5.0)'
+        required: true
+        default: '1.5.0'
 
 jobs:
   pypi-publish:
     name: Build and publish to PyPI
     runs-on: ubuntu-latest
     
-    # Questi permessi servono a PyPI per il Trusted Publishing
     permissions:
       id-token: write
       contents: read
@@ -24,16 +29,18 @@ jobs:
       with:
         python-version: '3.12'
 
-    - name: Estrai la versione dal Tag di GitHub
+    - name: Estrai la versione
       id: extract_version
-      # Prende il tag (es. v1.5.1), toglie la "v" e lo salva
       run: |
-        VERSION=${GITHUB_REF_NAME#v}
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          VERSION="${{ github.event.inputs.manual_version }}"
+        else
+          VERSION=${GITHUB_REF_NAME#v}
+        fi
         echo "VERSION=$VERSION" >> $GITHUB_ENV
         echo "La versione che verrà iniettata è: $VERSION"
 
     - name: Inietta la versione nel setup.py
-      # Cerca "version='...'" nel setup.py e lo sostituisce con la nuova versione
       run: |
         sed -i "s/version=['\"].*['\"]/version='${{ env.VERSION }}'/g" setup.py
         echo "Verifica del setup.py aggiornato:"
@@ -42,7 +49,7 @@ jobs:
     - name: Installa i tool di compilazione
       run: python -m pip install --upgrade pip build
 
-    - name: Compila il pacchetto (Wheel e Tarball)
+    - name: Compila il pacchetto
       run: python -m build
 
     - name: Pubblica su PyPI
