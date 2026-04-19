@@ -558,14 +558,23 @@ class Download:
 
     @staticmethod
     def _get_filename_attr(track_artist, track_metadata: dict, album_metadata: dict):     
+        
+        # Funzione helper per appiattire la lista degli artisti per i nomi dei file/cartelle
+        def _flatten_artists(artist_data):
+            if isinstance(artist_data, list):
+                return ", ".join(artist_data)
+            return str(artist_data) if artist_data else ""
            
+        album_artist_raw = get_album_artist(album_metadata)
+        album_artist_str = _flatten_artists(album_artist_raw) if album_artist_raw else track_artist
+
         return {
             "artist": track_artist,
-            "albumartist": get_album_artist(album_metadata) if get_album_artist(album_metadata) else track_artist,
+            "albumartist": album_artist_str,
             "tracktitle": _get_title(track_metadata),
             "album_title":  _get_title(album_metadata),
             "album_title_base": album_metadata.get("title"),
-            "album_artist": get_album_artist(album_metadata) if get_album_artist(album_metadata) else track_artist,
+            "album_artist": album_artist_str,
             "track_id": track_metadata.get("id"),
             "track_artist": track_artist,
             "track_composer": _safe_get(track_metadata,"composer", "name"),
@@ -576,7 +585,7 @@ class Download:
             "track_title": _get_title(track_metadata),
             "track_title_base": track_metadata.get("title"),
             "version": track_metadata.get("version"),
-            "year": track_metadata.get("release_date_original").split("-")[0],
+            "year": track_metadata.get("release_date_original", "").split("-")[0],
             "disc_number": f'{track_metadata.get("media_number"):02}',
             "release_date": track_metadata.get("release_date_original"),
             "ExplicitFlag": "[E]" if track_metadata.get("parental_warning") else "",
@@ -586,9 +595,19 @@ class Download:
     @staticmethod
     def _get_track_attr(meta, track_title, bit_depth, sampling_rate, file_format):
         album_meta = meta.get("album", {})
+        
+        # Funzione helper per appiattire la lista degli artisti per i nomi dei file/cartelle
+        def _flatten_artists(artist_data):
+            if isinstance(artist_data, list):
+                return ", ".join(artist_data)
+            return str(artist_data) if artist_data else ""
+            
+        album_artist_raw = get_album_artist(album_meta)
+        album_artist_str = _flatten_artists(album_artist_raw) if album_artist_raw else _safe_get(meta, "performer", "name")
+
         return {
             "album": _get_title(album_meta),
-            "artist": get_album_artist(album_meta) if get_album_artist(album_meta) else _safe_get(meta, "performer", "name"),
+            "artist": album_artist_str,
             "tracktitle": track_title,
             "track_title": track_title,
             "track_title_base": meta.get("title", ""),
@@ -596,7 +615,7 @@ class Download:
             "album_url": meta.get("url", ""),
             "album_title": _get_title(album_meta),
             "album_title_base": album_meta.get("title", ""),
-            "album_artist": get_album_artist(album_meta) if get_album_artist(album_meta) else _safe_get(meta, "performer", "name"),
+            "album_artist": album_artist_str,
             "album_genre": meta.get("genre", {}).get("name", ""),
             "album_composer": meta.get("composer", {}).get("name", ""),
             "label": re.sub(r'\s*[\;\/]\s*|\s+\-\s+',' ／ ', ' '.join(meta.get("label",{}).get("name", "").split())).strip(),
@@ -621,6 +640,16 @@ class Download:
 
     @staticmethod
     def _get_album_attr(meta, album_title, file_format, bit_depth, sampling_rate):
+        
+        # Funzione helper per appiattire la lista degli artisti per i nomi dei file/cartelle
+        def _flatten_artists(artist_data):
+            if isinstance(artist_data, list):
+                return ", ".join(artist_data)
+            return str(artist_data) if artist_data else ""
+            
+        album_artist_raw = get_album_artist(meta)
+        album_artist_str = _flatten_artists(album_artist_raw)
+
         return {
             "artist": meta.get("artist", {}).get("name", ""),
             "album": album_title,
@@ -628,7 +657,7 @@ class Download:
             "album_url": meta.get("url", ""),
             "album_title": album_title,
             "album_title_base": meta.get("title", ""),
-            "album_artist": get_album_artist(meta),
+            "album_artist": album_artist_str,
             "album_genre": meta.get("genre", {}).get("name", ""),
             "album_composer": meta.get("composer", {}).get("name", ""),
             "label": re.sub(r'\s*[\;\/]\s*|\s+\-\s+',' ∕ ', ' '.join(meta.get("label",{}).get("name", "").split())).strip(),
