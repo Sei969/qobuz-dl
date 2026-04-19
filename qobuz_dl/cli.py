@@ -269,7 +269,7 @@ def main():
     # ----------------------------------------------
 
     # --- RETRO LYRICS FEATURE (Standalone Mode) ---
-    # Intercettiamo il comando qui prima che QobuzDLSettings cerchi 'directory' mandando in crash il programma
+    # Intercept the command here before QobuzDLSettings looks for 'directory', which would crash the program
     if arguments.command == "lyrics":
         from qobuz_dl.retro_tagger import inject_lyrics_retroactively
         
@@ -279,7 +279,11 @@ def main():
             if not target_dir.startswith("\\\\?\\"):
                 target_dir = "\\\\?\\" + target_dir
                 
-        inject_lyrics_retroactively(target_dir, genius_token=genius_token)
+        try:
+            inject_lyrics_retroactively(target_dir, genius_token=genius_token)
+        except KeyboardInterrupt:
+            print("\n\n\033[91m[!] Operation manually interrupted by the user (CTRL+C).\033[0m")
+            print("\033[93mAlready processed files are safe. Exiting...\033[0m")
         sys.exit(0)
     # ----------------------------------------------
 

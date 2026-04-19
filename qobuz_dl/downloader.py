@@ -506,44 +506,16 @@ class Download:
             safe_print(f"{RED}[!] Error tagging: {e}{OFF}")
 
         if getattr(self, 'fetch_lyrics', False) and hasattr(self, 'lyrics_engine'):
-            # --- FIX: ULTIMATE CLASSICAL/INSTRUMENTAL DETECTOR ---
-            # 1. Identify the album regardless of how the download was initiated
-            album_meta_ref = album_or_track_metadata.get("album", {}) if is_track else album_or_track_metadata
+            search_artist = _safe_get(track_metadata, "performer", "name") or _safe_get(album_or_track_metadata, "artist", "name", default="Unknown")
+            search_album = _safe_get(track_metadata, "album", "title", default="")
             
-            # 2. Collect all possible clues into a giant string for pattern matching
-            t_genre = str(_safe_get(track_metadata, "genre", "name", default="")).lower()
-            a_genre = str(_safe_get(album_meta_ref, "genre", "name", default="")).lower()
-            a_genres_list = str(album_meta_ref.get("genres_list", [])).lower()
-            performers_str = str(track_metadata.get("performers", "")).lower()
-            
-            combined_indicators = f"{t_genre} {a_genre} {a_genres_list} {performers_str}"
-            
-            # 3. Ruthless vocabulary (Strictly Genres and Formations, NO Instruments to avoid false positives)
-            classical_keywords = [
-                # Broad genres and formats
-                "classic", "classique", "opera", "symphon", 
-                "orchestr", "concerto", "sonata",
-                "requiem", "chorale", "fugue", "prelude", "recital",
-                
-                # Roles and Formations
-                "conductor", "choir", "philharmonic", "ensemble",
-                "chamber", "quartet", "quintet"
-            ]
-            
-            # If any of these words are found, block the lyrics search
-            if any(k in combined_indicators for k in classical_keywords):
-                safe_print(f"{CYAN}    * Classical/Instrumental profile detected: Skipping lyrics search.{OFF}")
-            else:
-                search_artist = _safe_get(track_metadata, "performer", "name") or _safe_get(album_or_track_metadata, "artist", "name", default="Unknown")
-                search_album = _safe_get(track_metadata, "album", "title", default="")
-                
-                with print_lock:
-                    self.lyrics_engine.fetch_and_inject(
-                        file_path=final_file,
-                        artist=search_artist,
-                        track=track_title,
-                        album=search_album
-                    )
+            with print_lock:
+                self.lyrics_engine.fetch_and_inject(
+                    file_path=final_file,
+                    artist=search_artist,
+                    track=track_title,
+                    album=search_album
+                )
 
         # --- HUMAN BEHAVIOR DELAY ---
         delay_time = getattr(self.settings, 'delay', 0)
