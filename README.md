@@ -1,6 +1,5 @@
 # qobuz-dl Ultimate Edition
-![Docker Image CI](https://github.com/Sei969/qobuz-dl/actions/workflows/docker.yml/badge.svg)
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Sei969/qobuz-dl/blob/master/Qobuz_Ultimate_Colab.ipynb)
+[![PyPI version](https://img.shields.io/pypi/v/qobuz-dl-ultimate.svg)](https://pypi.org/project/qobuz-dl-ultimate/) ![Docker Image CI](https://github.com/Sei969/qobuz-dl/actions/workflows/docker.yml/badge.svg) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Sei969/qobuz-dl/blob/master/Qobuz_Ultimate_Colab.ipynb)
 
 Search, explore, and download Lossless and Hi-Res music from [Qobuz](https://www.qobuz.com/).
 
