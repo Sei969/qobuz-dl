@@ -309,37 +309,30 @@ class QobuzDL:
                 if mode_dict["requires_extra"]:
                     artist = i.get("artist", {}).get("name") or i.get("performer", {}).get("name") or "Unknown"
                     
-                    # --- SMART TITLE: Explicit & Version Tags ---
                     title = i.get("title") or i.get("name") or "Unknown"
                     if i.get("version"):
                         title = f"{title} ({i.get('version')})"
                     if i.get("parental_warning"):
                         title = f"{title} [E]"
-                    # --------------------------------------------
                     
                     year = str(i.get("release_date_original") or i.get("release_date") or "    ")[:4]
                     
-                    # --- RELEASE TYPE (ULTIMATE SMART ENGINE) ---
                     raw_type = i.get("release_type") or i.get("product_type")
                     if not raw_type:
                         t_count = i.get("tracks_count", 0)
                         duration = i.get("duration", 0) 
                         
                         if item_type == "album" and (t_count or duration):
-                            # Se dura 29+ minuti (1740s) o ha 7+ tracce, è un Album
                             if duration >= 1740 or t_count >= 7:
                                 raw_type = "Album"
-                            # Se ha 1 sola traccia ed è sotto i 29 min, è un Singolo
                             elif t_count == 1:
                                 raw_type = "Single"
-                            # Tutto ciò che sta nel mezzo (2-6 tracce, <29 min) è un EP
                             else:
                                 raw_type = "EP"
                         else:
                             raw_type = item_type
                             
                     rel_type = "EP" if raw_type.lower() == "ep" else raw_type.title()
-                    # --------------------------------------------
                     
                     if i.get("hires_streamable"):
                         bit_depth = i.get("maximum_bit_depth", 24)
@@ -348,13 +341,15 @@ class QobuzDL:
                     else:
                         quality = "[ CD ] 16b/44.1kHz"
                         
-                    # Title width 35, Type width 8
-                    text = f"{_align_text(artist, 20)} │ {_align_text(title, 35)} │ {_align_text(rel_type, 8)} │ {year} │ {quality}"
+                    # --- MODIFICA 1 APPLICATA QUI SOTTO: Via le '│', usiamo 3 spazi ---
+                    text = f"{_align_text(artist, 20)}   {_align_text(title, 35)}   {_align_text(rel_type, 8)}   {year}   {quality}"
                 else:
                     name = i.get("name", "Unknown")
                     count = i.get("albums_count") if "albums_count" in i else i.get("tracks_count", 0)
                     desc = "albums" if "albums_count" in i else "tracks"
-                    text = f"{_align_text(name, 50)} │ {count} {desc}"
+                    
+                    # --- MODIFICA 1 APPLICATA QUI SOTTO: Via le '│', usiamo 3 spazi ---
+                    text = f"{_align_text(name, 50)}   {count} {desc}"
 
                 url = "{}{}/{}".format(WEB_URL, item_type, i.get("id", ""))
                 item_list.append({"text": text, "url": url} if not lucky else url)
@@ -366,7 +361,13 @@ class QobuzDL:
 
     def interactive(self, download=True):
         try:
-            from pick import pick
+            import pick
+            # --- WINDOWS TERMINAL FIX & MULTISELECT LOOK ---
+            # Using clean, aligned square brackets for the multi-select interface
+            if hasattr(pick, 'SYMBOL_CIRCLE_EMPTY'):
+                pick.SYMBOL_CIRCLE_EMPTY = '[ ]'
+                pick.SYMBOL_CIRCLE_FILLED = '[X]'
+            # -----------------------------------------------
         except (ImportError, ModuleNotFoundError):
             if os.name == "nt":
                 sys.exit(
@@ -384,42 +385,38 @@ class QobuzDL:
 
         try:
             item_types = ["Albums", "Tracks", "Artists", "Playlists"]
-            selected_type = pick(item_types, "I'll search for:\n[press Intro]")[0][
-                :-1
-            ].lower()
+            selected_type = pick.pick(item_types, "I'll search for:\n[press Intro]")[0][:-1].lower()
             logger.info(f"{YELLOW}Ok, we'll search for {selected_type}s{RESET}")
             final_url_list = []
             
             while True:
-                query = input(
-                    f"{CYAN}Enter your search: [Ctrl + c to quit]\n" f"-{DF} "
-                )
+                query = input(f"{CYAN}Enter your search: [Ctrl + c to quit]\n-{DF} ")
                 logger.info(f"{YELLOW}Searching...{RESET}")
-                options = self.search_by_type(
-                    query, selected_type, self.interactive_limit
-                )
+                options = self.search_by_type(query, selected_type, self.interactive_limit)
+                
                 if not options:
                     logger.info(f"{OFF}Nothing found{RESET}")
                     continue
                 
-                # --- DYNAMIC HEADER ALIGNMENT (Fixes the broken columns) ---
+                # --- CALIBRATED MINIMAL HEADER (7 SPACES FOR PERFECT ALIGNMENT) ---
                 if selected_type in ["album", "track"]:
                     artist_h = "ARTIST".ljust(20)
-                    title_h = "TITLE".ljust(35)  # Ridotto a 35 per fare spazio
-                    type_h = "TYPE".ljust(8)     # Nuova colonna
+                    title_h = "TITLE".ljust(35)
+                    type_h = "TYPE".ljust(8)
                     year_h = "YEAR".ljust(4)
                     
+                    # Using 7 leading spaces to align the 'A' of ARTIST exactly above the first letter of the data
                     table_header = (
-                        f"  {artist_h} │ {title_h} │ {type_h} │ {year_h} │ QUALITY\n"
-                        f" ─{'─'*20}─┼─{'─'*35}─┼─{'─'*8}─┼─{'─'*4}─┼───────────────"
+                        f"       {artist_h}   {title_h}   {type_h}   {year_h}   QUALITY\n"
+                        f"       {'-' * 88}"
                     )
                 else:
                     name_h = "NAME".ljust(50)
                     table_header = (
-                        f"  {name_h} │ RELEASES\n"
-                        f" ─{'─'*50}─┼──────────"
+                        f"       {name_h}   RELEASES\n"
+                        f"       {'-' * 63}"
                     )
-                # -----------------------------------------------------------
+                # ------------------------------------------------------------------
 
                 title = (
                     f'*** RESULTS FOR "{query.title()}" ***\n\n'
@@ -429,7 +426,8 @@ class QobuzDL:
                 )
                 
                 options_texts = [opt.get("text") for opt in options]
-                selected_items = pick(
+                
+                selected_items = pick.pick(
                     options_texts,
                     title,
                     multiselect=True,
@@ -439,35 +437,24 @@ class QobuzDL:
                 if len(selected_items) > 0:
                     [final_url_list.append(options[i[1]]["url"]) for i in selected_items]
                     
-                    y_n = pick(
-                        ["Yes", "No"],
-                        "Items were added to queue to be downloaded. "
-                        "Keep searching?",
-                    )
+                    y_n = pick.pick(["Yes", "No"], "Items were added to queue to be downloaded. Keep searching?")
                     if y_n[0] == "No":
                         break
                 else:
                     logger.info(f"{YELLOW}Ok, try again...{RESET}")
                     continue
+                    
             if final_url_list:
-                desc = (
-                    "Select [intro] the quality (the quality will "
-                    "be automatically\ndowngraded if the selected "
-                    "is not found)"
-                )
-                
+                desc = "Select [intro] the quality (the quality will be automatically\ndowngraded if the selected is not found)"
                 qualities_texts = [q.get("q_string") for q in qualities]
-                selected_quality = pick(
-                    qualities_texts,
-                    desc,
-                    default_index=1,
-                )
+                selected_quality = pick.pick(qualities_texts, desc, default_index=1)
                 self.quality = qualities[selected_quality[1]]["q"]
 
                 if download:
                     self.download_list_of_urls(final_url_list)
 
                 return final_url_list
+                
         except KeyboardInterrupt:
             logger.info(f"{YELLOW}Bye")
             return
