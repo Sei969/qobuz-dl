@@ -190,7 +190,7 @@ You can customize your `config.ini` or use the CLI flags `-ff` (Folder Format) a
 * **[vitiko98](https://github.com/vitiko98/qobuz-dl)**: Creator of the original project.
 * **[xwell](https://github.com/xwell/qobuz-dl)**: For the massive tag refactoring and "Goodies" integration.
 * **[catap](https://github.com/catap)**: For the segmented download patch.
-* **Sorrow446 & DashLt**: `qobuz-dl` is inspired by the discontinued Qo-DL-Reborn. This tool uses two modules from Qo-DL: `qopy` and `spoofer`, both written by them.
+** **Sorrow446 & DashLt**: `qobuz-dl` is inspired by the discontinued Qo-DL-Reborn. This tool uses the core API module `qopy`, originally written by them.
 
 ## ⚠️ Disclaimer
 * This tool was written for educational purposes.
