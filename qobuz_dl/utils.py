@@ -41,40 +41,39 @@ def make_m3u(pl_directory):
     track_list = ["#EXTM3U"]
     rel_folder = os.path.basename(os.path.normpath(pl_directory))
     pl_name = rel_folder + ".m3u"
+    pl_full_path = os.path.join(pl_directory, pl_name)
+
     for local, dirs, files in os.walk(pl_directory):
         dirs.sort()
-        audio_rel_files = [
-            os.path.join(os.path.basename(os.path.normpath(local)), file_)
-            for file_ in files
-            if os.path.splitext(file_)[-1] in EXTENSIONS
-        ]
-        audio_files = [
-            os.path.abspath(os.path.join(local, file_))
-            for file_ in files
-            if os.path.splitext(file_)[-1] in EXTENSIONS
-        ]
-        if not audio_files or len(audio_files) != len(audio_rel_files):
-            continue
 
-        for audio_rel_file, audio_file in zip(audio_rel_files, audio_files):
+        audio_files = [
+            f for f in files if os.path.splitext(f)[-1].lower() in EXTENSIONS
+        ]
+
+        for file_ in audio_files:
+            audio_full_path = os.path.abspath(os.path.join(local, file_))
+            audio_rel_path = os.path.relpath(audio_full_path, pl_directory)
+
             try:
                 pl_item = (
-                    EasyMP3(audio_file) if ".mp3" in audio_file else FLAC(audio_file)
+                    EasyMP3(audio_full_path)
+                    if audio_full_path.lower().endswith(".mp3")
+                    else FLAC(audio_full_path)
                 )
-                title = pl_item["TITLE"][0]
-                artist = pl_item["ARTIST"][0]
+
+                title = pl_item.get("TITLE", ["Unknown Title"])[0]
+                artist = pl_item.get("ARTIST", ["Unknown Artist"])[0]
                 length = int(pl_item.info.length)
-                index = "#EXTINF:{}, {} - {}\n{}".format(
-                    length, artist, title, audio_rel_file
-                )
-            except:  # noqa
+
+                index = f"#EXTINF:{length}, {artist} - {title}\n{audio_rel_path}"
+                track_list.append(index)
+            except Exception as e:
+                logger.error(f"Error processing {file_}: {e}")
                 continue
-            track_list.append(index)
 
     if len(track_list) > 1:
-        # --- FIX: FORZIAMO L'UTF-8 PER I CARATTERI SPECIALI ---
-        with open(os.path.join(pl_directory, pl_name), "w", encoding="utf-8") as pl:
-            pl.write("\n\n".join(track_list))
+        with open(pl_full_path, "w", encoding="utf-8") as pl:
+            pl.write("\n".join(track_list))
 
 
 def smart_discography_filter(
