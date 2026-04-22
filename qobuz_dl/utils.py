@@ -36,12 +36,14 @@ class PartialFormatter(string.Formatter):
                 return self.bad_fmt
             raise
 
-
 def make_m3u(pl_directory):
     track_list = ["#EXTM3U"]
     rel_folder = os.path.basename(os.path.normpath(pl_directory))
     pl_name = rel_folder + ".m3u"
     pl_full_path = os.path.join(pl_directory, pl_name)
+
+    def natural_sort_key(s):
+        return [int(text) if text.isdigit() else text.lower() for text in re.split(r'(\d+)', s)]
 
     for local, dirs, files in os.walk(pl_directory):
         dirs.sort()
@@ -49,6 +51,8 @@ def make_m3u(pl_directory):
         audio_files = [
             f for f in files if os.path.splitext(f)[-1].lower() in EXTENSIONS
         ]
+
+        audio_files.sort(key=natural_sort_key)
 
         for file_ in audio_files:
             audio_full_path = os.path.abspath(os.path.join(local, file_))
