@@ -24,6 +24,9 @@ Search, explore, and download Lossless and Hi-Res music from [Qobuz](https://www
 * **Clean Multithreading UI:** Intelligently switches to a clutter-free, static logging system displaying precise file sizes (MB) during concurrent downloads. This prevents terminal visual glitches and "cursor wars" with the Lyrics Engine, while preserving the classic animated progress bars for sequential (`--delay`) downloads.
 * **Smart Quality Fallback:** Automatically downgrades to the next best available quality if the requested tier is restricted by the server, ensuring your download queue never crashes.
 * **Authentication Bypass:** Log in securely using your browser's **Auth Token** if standard password authentication is blocked. Graciously handles Free/Studio accounts.
+* **Limitless Playlists:** Overcomes Qobuz API restrictions by dynamically paginating chunk requests, allowing you to seamlessly queue and download massive playlists without the standard 50-track bottleneck.
+* **Smart Resume (No Overwrites):** Intelligently detects existing files on your local drive and automatically skips them. If a massive discography download gets interrupted, it resumes instantly without wasting time or bandwidth re-downloading existing tracks.
+* **Flawless `.m3u` Generation:** Automatically generates playlist files with correct relative folder paths and strict "Natural Sort" ordering, guaranteeing the perfect playback sequence out-of-the-box in any media player.
 
 ### 📁 Advanced Formatting & Storage
 
