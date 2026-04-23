@@ -185,6 +185,16 @@ The Ultimate Edition includes powerful local library managers to keep track of y
   python -m qobuz_dl lyrics "/path/to/your/local/music/folder"
   ```
 
+* **Playlist Sync (`sync-playlist` / `sp`):**
+  Keep a local playlist folder perfectly in sync with a Qobuz playlist. The engine compares your local files (via embedded `QOBUZTRACKID` tags) against the current online playlist, downloads any missing tracks, and deletes tracks that were removed from the playlist. A confirmation prompt is shown before making changes.
+  ```bash
+  # Sync a local folder with a Qobuz playlist
+  python -m qobuz_dl sp "https://play.qobuz.com/playlist/12345" "/path/to/playlist/folder"
+
+  # Skip the confirmation prompt
+  python -m qobuz_dl sp "https://play.qobuz.com/playlist/12345" "/path/to/playlist/folder" --yes
+  ```
+
 * **Purge Database (`-p`, `--purge`):**
   If you ever need to start fresh, clear your download history, or fix a corrupted state, you can instantly wipe the local database with a single command.
   ```bash
