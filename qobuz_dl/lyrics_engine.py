@@ -44,10 +44,10 @@ class LyricsEngine:
                 plain_lyrics = data.get("plainLyrics")
                 
                 if synced_lyrics:
-                    self._save_lrc_file(file_path, synced_lyrics)
-                    # INIEZIONE CORRETTA: Passiamo il testo con i timestamp temporali!
+                    # Synced lyrics are embedded directly into the FLAC/MP3 metadata
+                    # (no external .lrc file needed — players read the LYRICS tag natively)
                     self._inject_metadata(file_path, synced_lyrics)
-                    print(f"    ✅ Synchronized lyrics saved and injected!")
+                    print(f"    ✅ Synchronized lyrics injected into metadata!")
                     return
                 elif plain_lyrics:
                     # Se non esiste la versione sincronizzata, ripieghiamo su quella statica

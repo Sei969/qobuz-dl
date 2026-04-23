@@ -69,6 +69,30 @@ def lyrics_args(subparsers):
     )
     return lyrics
 
+
+def sync_playlist_args(subparsers):
+    sync_pl = subparsers.add_parser(
+        "sync-playlist",
+        aliases=["sp"],
+        description="Synchronize a local folder with a Qobuz playlist. "
+                    "Downloads missing tracks and removes tracks no longer in the playlist.",
+        help="sync a local folder with a Qobuz playlist",
+    )
+    sync_pl.add_argument(
+        "URL",
+        help="Qobuz playlist URL (e.g. https://play.qobuz.com/playlist/12345)",
+    )
+    sync_pl.add_argument(
+        "FOLDER",
+        help="Local folder path to synchronize",
+    )
+    sync_pl.add_argument(
+        "--yes", "-y",
+        action="store_true",
+        help="Skip confirmation prompt before deleting/downloading",
+    )
+    return sync_pl
+
 def add_common_arg(custom_parser, default_folder, default_quality):
     custom_parser.add_argument(
         "-d",
@@ -370,10 +394,11 @@ def qobuz_dl_args(
     
     # Inizializza il nuovo comando
     lyrics_cmd = lyrics_args(subparsers)
+    sync_pl_cmd = sync_playlist_args(subparsers)
     
     [
         add_common_arg(i, default_folder, default_quality)
-        for i in (interactive, download, lucky)
+        for i in (interactive, download, lucky, sync_pl_cmd)
     ]
 
     return parser

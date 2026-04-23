@@ -42,7 +42,7 @@ Qobuz-DL Ultimate allows deep customization of your library structure using vari
   * *Folder Example (Prefix):* `folder_format = {release_type} - {album_artist} - {album_title}` ➔ `Single - Gorillaz - Silent Running`
 * **Explicit Tag (`{explicit}` or `{ExplicitFlag}`):** Automatically adds an `[E]` tag if the track or album is marked with a parental advisory warning on Qobuz. If the content is clean, the variable remains empty without leaving unwanted trailing spaces. **You can apply this permanently by adding the variables to your `config.ini` file, or temporarily via CLI using the `-ff` and `-tf` flags.**
   * *Folder Example:* `folder_format = {artist} - {album} {ExplicitFlag}` ➔ `Eminem - The Eminem Show [E]`
-  * *Track Example:* `track_format = {track_number} - {tracktitle} {ExplicitFlag}` ➔ `02 - Without Me [E].flac`
+  * *Track Example:* `track_format = {track_number} - {track_title} {ExplicitFlag}` ➔ `02 - Without Me [E].flac`
 * **Album Version Tag (`{version_tag}`):** Automatically appends the album version (e.g., Live, Remastered, Deluxe Edition) to your folder or track name. If the release is a standard edition, the variable remains completely empty, preventing unwanted trailing spaces or dashes.
   * *Folder Example (Standard):* `folder_format = {album_artist} - {album_title}{version_tag}` ➔ `The Sunset Violent`
   * *Folder Example (Special Edition):* `folder_format = {album_artist} - {album_title}{version_tag}` ➔ `The Sunset Violent - Live in Heidelberg`
@@ -183,6 +183,16 @@ The Ultimate Edition includes powerful local library managers to keep track of y
   Do you have an existing local music library that lacks synced lyrics? The new `lyrics` command acts as a standalone metadata engine. It recursively scans any local directory, detects FLAC/MP3 files missing lyrics, and intelligently injects them into the audio files using LRCLIB (and Genius API) without re-downloading any music.
   ```bash
   python -m qobuz_dl lyrics "/path/to/your/local/music/folder"
+  ```
+
+* **Playlist Sync (`sync-playlist` / `sp`):**
+  Keep a local playlist folder perfectly in sync with a Qobuz playlist. The engine compares your local files (via embedded `QOBUZTRACKID` tags) against the current online playlist, downloads any missing tracks, and deletes tracks that were removed from the playlist. A confirmation prompt is shown before making changes.
+  ```bash
+  # Sync a local folder with a Qobuz playlist
+  python -m qobuz_dl sp "https://play.qobuz.com/playlist/12345" "/path/to/playlist/folder"
+
+  # Skip the confirmation prompt
+  python -m qobuz_dl sp "https://play.qobuz.com/playlist/12345" "/path/to/playlist/folder" --yes
   ```
 
 * **Purge Database (`-p`, `--purge`):**

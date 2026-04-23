@@ -381,7 +381,7 @@ class Client:
             yield res
             
             offset += len(items)
-            total_available = res.get(key, 0)
+            total_available = res.get(items_key, {}).get("total", res.get(key, 0))
             if offset >= total_available:
                 break
 
