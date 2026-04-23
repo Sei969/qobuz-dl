@@ -42,7 +42,7 @@ Qobuz-DL Ultimate allows deep customization of your library structure using vari
   * *Folder Example (Prefix):* `folder_format = {release_type} - {album_artist} - {album_title}` ➔ `Single - Gorillaz - Silent Running`
 * **Explicit Tag (`{explicit}` or `{ExplicitFlag}`):** Automatically adds an `[E]` tag if the track or album is marked with a parental advisory warning on Qobuz. If the content is clean, the variable remains empty without leaving unwanted trailing spaces. **You can apply this permanently by adding the variables to your `config.ini` file, or temporarily via CLI using the `-ff` and `-tf` flags.**
   * *Folder Example:* `folder_format = {artist} - {album} {ExplicitFlag}` ➔ `Eminem - The Eminem Show [E]`
-  * *Track Example:* `track_format = {track_number} - {tracktitle} {ExplicitFlag}` ➔ `02 - Without Me [E].flac`
+  * *Track Example:* `track_format = {track_number} - {track_title} {ExplicitFlag}` ➔ `02 - Without Me [E].flac`
 * **Album Version Tag (`{version_tag}`):** Automatically appends the album version (e.g., Live, Remastered, Deluxe Edition) to your folder or track name. If the release is a standard edition, the variable remains completely empty, preventing unwanted trailing spaces or dashes.
   * *Folder Example (Standard):* `folder_format = {album_artist} - {album_title}{version_tag}` ➔ `The Sunset Violent`
   * *Folder Example (Special Edition):* `folder_format = {album_artist} - {album_title}{version_tag}` ➔ `The Sunset Violent - Live in Heidelberg`
