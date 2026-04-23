@@ -60,7 +60,7 @@ class QobuzDL:
         downloads_db=None,
         folder_format="{artist} - {album} ({year}) [{bit_depth}B-"
         "{sampling_rate}kHz]",
-        track_format="{tracknumber}. {tracktitle}",
+        track_format="{track_number} - {track_title}",
         smart_discography=False,
         fetch_lyrics=False,
         genius_token=None,

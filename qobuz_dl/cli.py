@@ -86,7 +86,7 @@ def _reset_config(config_file):
     config["qobuz"]["secrets"] = ",".join(bundle.get_secrets().values())
 
     # Removed old folder_format override that caused custom format resets
-    config["qobuz"]["track_format"] = "{tracknumber} {tracktitle}"
+    config["qobuz"]["track_format"] = "{track_number} - {track_title}"
     config["qobuz"]["fallback_folder_format"] = "{artist} - {album}"
     config["qobuz"]["smart_discography"] = "false"
 
@@ -265,8 +265,7 @@ def main():
     if getattr(arguments, 'sync_db', None):
         from qobuz_dl.sync import sync_database
         from qobuz_dl.qopy import Client
-        from qobuz_dl.color import GREEN, OFF
-        
+                
         # Inizializza un client API leggero per il Reverse Lookup (ignora il downloader pesante)
         sync_client = Client(email, password, app_id, secrets, user_auth_token=token, force_english=force_english)
         
