@@ -241,7 +241,14 @@ class Download:
         with concurrent.futures.ThreadPoolExecutor(max_workers=active_workers) as executor:
             futures = []
             for i in album_meta["tracks"]["items"]:
-                parse = self.client.get_track_url(i["id"], fmt_id=self.quality)
+                try:
+                    parse = self.client.get_track_url(i["id"], fmt_id=self.quality)
+                except Exception as e:
+                    safe_print(f"{RED}[!] API Error for track {i.get('track_number', 'unknown')} (ID: {i['id']}): {e}{OFF}")
+                    safe_print(f"{YELLOW}[*] Skipping track and continuing with the album...{OFF}")
+                    count += 1
+                    continue
+
                 if "sample" not in parse and parse["sampling_rate"]:
                     is_mp3 = True if int(self.quality) == 5 else False
                     futures.append(
@@ -260,19 +267,22 @@ class Download:
                     )
                 else:
                     logger.info(f"{OFF}Demo. Skipping")
-                count = count + 1
+                count += 1
                 
             try:
                 for f in futures:
                     while not f.done():
                         time.sleep(0.2)
                 for f in futures:
-                    f.result()
+                    try:
+                        f.result()
+                    except Exception as inner_e:
+                        safe_print(f"{RED}[!] Track download failed: {inner_e}{OFF}")
             except KeyboardInterrupt:
                 safe_print(f"\n{RED}[!] CTRL+C Detected: Forcing termination of ongoing downloads...{OFF}")
                 os._exit(1)
             except Exception as e:
-                logger.error(f"{RED}[!] Thread Exception: {e}{OFF}")
+                logger.error(f"{RED}[!] Thread Execution Exception: {e}{OFF}")
             
         _clean_embed_art(dirn, self.settings)
         
