@@ -17,6 +17,7 @@ Search, explore, and download Lossless and Hi-Res music from [Qobuz](https://www
 * **Enhanced Digital Booklets:** Automatically compiles a beautifully formatted `.txt` file with a complete tracklist, runtime, full credits, metadata, and reviews. Upon completion, the engine intelligently sweeps the folder, strips timestamps from `.lrc` files, and appends the pure text lyrics of the entire album directly into the booklet. Official PDF "Goodies" are also downloaded alongside it.
 
 ### 🚀 Resilient Download Engine
+* **Bulletproof Queue:** Advanced track-level exception handling. If a single track is geo-blocked or missing from the servers (404 error), the engine gracefully skips it and seamlessly continues downloading the rest of your album or playlist without crashing.
 * **Database Recovery & Sync:** Includes a specialized `--sync-db` engine to restore missing entries in your local database by scanning your existing music folders.
 * **Smart Reverse Lookup:** Automatically identifies legacy files by reading their **ISRC** or **UPC** tags and querying the Qobuz API to restore the correct IDs into the database.
 * **Segmented Download & Remuxing:** Bypasses Akamai CDN throttling with a high-speed segmented download engine and automatic FFmpeg remuxing.
@@ -113,6 +114,14 @@ The fastest way to download directly to your Google Drive at Gigabit speeds, byp
 * **Zero Setup:** Runs entirely in your browser (works seamlessly on smartphones and tablets too).
 * **Usage:** Click the badge above, run the setup cells to mount your Google Drive, paste your Qobuz Auth Token, and start downloading directly to the cloud.
 
+### ⚙️ Configuration & Custom Paths
+If you want to set a custom download folder, you can edit your `config.ini` file and use the `directory` key. Absolute paths and the `~` operator (for macOS/Linux) are fully supported!
+```ini
+[qobuz]
+directory = ~/Music/Qobuz_Lossless
+```
+*(Note: If you are upgrading from an older version, the legacy `default_folder` key is still fully supported for backward compatibility.)*
+
 ### 🔑 How to get your Auth Token
 Since Qobuz blocked direct password logins for third-party applications, you need to provide your browser's Auth Token during the initial configuration. Here is how to easily find it:
 1. Open the [Qobuz Web Player](https://play.qobuz.com) in your browser and log in.
@@ -145,10 +154,16 @@ usage: python -m qobuz_dl dl [-h] [-d PATH] [-q int] [--albums-only] [--no-m3u] 
 ```bash
 python -m qobuz_dl radar
 ```
-							 
+                            
 **Basic Album/Playlist Download:**
 ```bash
-python -m qobuz_dl dl https://play.qobuz.com/album/qxjbxh1dc3xyb
+python -m qobuz_dl dl [https://play.qobuz.com/album/qxjbxh1dc3xyb](https://play.qobuz.com/album/qxjbxh1dc3xyb)
+```
+
+**Mass/Batch Downloading:**
+Do you have a massive list of releases to download? Create a standard text file (e.g., `list.txt`), paste all your Qobuz URLs inside (one per line), and pass it to the engine. It will automatically read the file and download your entire queue!
+```bash
+python -m qobuz_dl dl list.txt
 ```
 
 **Safe Download (Anti-Ban):**
@@ -160,7 +175,7 @@ python -m qobuz_dl dl <URL> --delay 1
 **Advanced Discography Routing:**
 Save multiple discs of a release in one single folder instead of splitting them.
 ```bash
-python -m qobuz_dl dl https://play.qobuz.com/artist/2038380 --multiple-disc-one-dir
+python -m qobuz_dl dl [https://play.qobuz.com/artist/2038380](https://play.qobuz.com/artist/2038380) --multiple-disc-one-dir
 ```
 
 **Interactive Last.fm Mode (Fun Mode):**
