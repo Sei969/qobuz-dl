@@ -7,6 +7,7 @@ import random
 import subprocess
 import re
 import threading
+import signal
 from typing import Tuple
 import concurrent.futures
 from concurrent.futures import ThreadPoolExecutor
@@ -27,18 +28,21 @@ from qobuz_dl.constants import DEFAULT_FOLDER, DEFAULT_TRACK, DEFAULT_MULTIPLE_D
 # UI Lock to prevent text scrambling during multithreading
 print_lock = threading.Lock()
 
+# Global Abort Event for graceful CTRL+C handling and file unlock
+abort_event = threading.Event()
+
 def safe_print(*args, **kwargs):
     with print_lock:
         text = " ".join(map(str, args))
         end = kwargs.get('end', '\n')
         tqdm.write(text, end=end)
 
-# --- FIX ISSUE #216: Normalizzazione del Release Type ---
+# --- FIX ISSUE #216: Normalize Release Type ---
 def format_release_type(release_type: str) -> str:
     """
-    Normalizza il tipo di pubblicazione (release_type) dalle API di Qobuz.
-    Converte 'ep' in 'EP', 'single' in 'Single', 'album' in 'Album', ecc.
-    Ritorna 'Unknown' come fallback robusto in assenza di dati.
+    Normalizes the release type from Qobuz APIs.
+    Converts 'ep' to 'EP', 'single' to 'Single', 'album' to 'Album', etc.
+    Returns 'Unknown' as a robust fallback if data is missing.
     """
     if not release_type:
         return "Unknown"
@@ -60,7 +64,6 @@ def process_folder_format_with_subdirs(folder_format, attr_dict, path=None):
                 cleaned_part = sanitize_filepath(clean_filename(formatted_part), replacement_text="_")
                 
                 # --- FIX: SMART TRUNCATION FOR ALBUM FOLDER ---
-                # Truncate exceptionally long folder names to prevent path length errors in third-party apps
                 if cleaned_part and len(cleaned_part) > 120:
                     start_f = cleaned_part[:60].rstrip(' ."-_\'')
                     end_f = cleaned_part[-50:].lstrip(' ."-_\'')
@@ -72,7 +75,6 @@ def process_folder_format_with_subdirs(folder_format, attr_dict, path=None):
                 logger.warning(f"{YELLOW}Format error ({e}), using original text.{OFF}")
                 cleaned_part = sanitize_filepath(clean_filename(part), replacement_text="_")
                 
-                # Apply truncation to the fallback as well
                 if cleaned_part and len(cleaned_part) > 120:
                     start_f = cleaned_part[:60].rstrip(' ."-_\'')
                     end_f = cleaned_part[-50:].lstrip(' ."-_\'')
@@ -123,8 +125,8 @@ class Download:
         no_credits: bool = False,
         settings: QobuzDLSettings = None,
         download_db=None,
-        is_playlist: bool = False,           # <-- NEW
-        playlist_track_number: int = None,   # <-- NEW
+        is_playlist: bool = False,           
+        playlist_track_number: int = None,   
     ):
         self.client = client
         self.item_id = item_id
@@ -146,8 +148,8 @@ class Download:
         self.settings = settings or QobuzDLSettings()
         self.download_db = download_db
         
-        self.is_playlist = is_playlist                       # <-- NEW
-        self.playlist_track_number = playlist_track_number   # <-- NEW
+        self.is_playlist = is_playlist                       
+        self.playlist_track_number = playlist_track_number   
         
         self._original_folder_format = folder_format or DEFAULT_FOLDER
         self._original_track_format = track_format or DEFAULT_TRACK
@@ -201,28 +203,33 @@ class Download:
         self._determine_formats(album_meta=album_meta, album_attr=album_attr, tracks_meta=album_meta["tracks"]["items"],
                                 track_attr=None, is_track=False, file_format=file_format, settings=self.settings)
         
-        dirn = process_folder_format_with_subdirs(self.folder_format, album_attr, self.path)
-        os.makedirs(dirn, exist_ok=True)
-
-        self._generate_tracklist(album_meta, dirn, album_title, file_format, bit_depth, sampling_rate)
-
-        if self.settings.no_cover:
-            logger.info(f"{OFF}Skipping cover")
+        target_dirn = process_folder_format_with_subdirs(self.folder_format, album_attr, self.path)
+        base_path, folder_name = os.path.split(target_dirn)
+        
+        incomplete_dirn = os.path.join(base_path, f"[INCOMPLETE] {folder_name}")
+        inprogress_dirn = os.path.join(base_path, f"[IN PROGRESS] {folder_name}")
+        
+        is_standard_album = not getattr(self, 'is_playlist', False)
+        
+        if is_standard_album:
+            working_dirn = inprogress_dirn
+            try:
+                if os.path.exists(incomplete_dirn):
+                    os.rename(incomplete_dirn, working_dirn)
+                elif os.path.exists(target_dirn):
+                    os.rename(target_dirn, working_dirn)
+            except OSError as e:
+                logger.warning(f"{YELLOW}[!] Could not rename existing folder to [IN PROGRESS]. Operating in standard mode. ({e}){OFF}")
+                working_dirn = target_dirn
         else:
-            _get_extra(album_meta["image"]["large"], dirn, art_size=self.settings.saved_art_size)
-
-        if self.settings.embed_art:
-            _get_extra(album_meta["image"]["large"], dirn, extra=EMB_COVER_NAME, art_size=self.settings.embedded_art_size)
-        else:
-            logger.info(f"{OFF}Skipping embedded art")
-
-        if "goodies" in album_meta:
-            _download_goodies(album_meta, dirn)
+            working_dirn = target_dirn
             
+        os.makedirs(working_dirn, exist_ok=True)
+        dirn = working_dirn
+
         media_count = album_meta.get("media_count", 1)
         is_multiple = True if media_count > 1 else False
         
-        # --- SMART SEQUENTIAL vs PARALLEL MODE ---
         delay_time = getattr(self.settings, 'delay', 0)
         if delay_time == 0 and '--delay' in sys.argv:
             try: delay_time = int(sys.argv[sys.argv.index('--delay') + 1])
@@ -238,62 +245,129 @@ class Download:
             is_parallel = True
             safe_print(f"{YELLOW}[*] Multithreading Enabled ({active_workers} workers): UI optimized for clean parallel logging.{OFF}")
             
-        with concurrent.futures.ThreadPoolExecutor(max_workers=active_workers) as executor:
-            futures = []
-            for i in album_meta["tracks"]["items"]:
-                try:
-                    parse = self.client.get_track_url(i["id"], fmt_id=self.quality)
-                except Exception as e:
-                    safe_print(f"{RED}[!] API Error for track {i.get('track_number', 'unknown')} (ID: {i['id']}): {e}{OFF}")
-                    safe_print(f"{YELLOW}[*] Skipping track and continuing with the album...{OFF}")
-                    count += 1
-                    continue
+        failed_tracks = 0
+        aborted_by_user = False
+        abort_event.clear()
 
-                if "sample" not in parse and parse["sampling_rate"]:
-                    is_mp3 = True if int(self.quality) == 5 else False
-                    futures.append(
-                        executor.submit(
-                            self._download_and_tag,
-                            dirn,
-                            count,
-                            parse,
-                            i,
-                            album_meta,
-                            False,
-                            is_mp3,
-                            i.get("media_number") if is_multiple else None,
-                            is_parallel=is_parallel # Injects the behavior modifier
-                        )
-                    )
-                else:
-                    logger.info(f"{OFF}Demo. Skipping")
-                count += 1
-                
-            try:
-                for f in futures:
-                    while not f.done():
-                        time.sleep(0.2)
-                for f in futures:
+        # --- SIGINT HIJACKER (Hacker Fix) ---
+        # Intercept Ctrl+C to prevent core/cli from brutally killing the process,
+        # ensuring we have time to release file locks and rename the folder to [INCOMPLETE].
+        original_sigint = None
+        try:
+            original_sigint = signal.getsignal(signal.SIGINT)
+            def custom_sigint_handler(sig, frame):
+                abort_event.set()
+                raise KeyboardInterrupt
+            signal.signal(signal.SIGINT, custom_sigint_handler)
+        except Exception:
+            pass
+
+        try:
+            self._generate_tracklist(album_meta, dirn, album_title, file_format, bit_depth, sampling_rate)
+
+            if self.settings.no_cover:
+                logger.info(f"{OFF}Skipping cover")
+            else:
+                _get_extra(album_meta["image"]["large"], dirn, art_size=self.settings.saved_art_size)
+
+            if self.settings.embed_art:
+                _get_extra(album_meta["image"]["large"], dirn, extra=EMB_COVER_NAME, art_size=self.settings.embedded_art_size)
+
+            if "goodies" in album_meta:
+                _download_goodies(album_meta, dirn)
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=active_workers) as executor:
+                futures = []
+                for i in album_meta["tracks"]["items"]:
+                    if abort_event.is_set():
+                        break
                     try:
-                        f.result()
-                    except Exception as inner_e:
-                        safe_print(f"{RED}[!] Track download failed: {inner_e}{OFF}")
-            except KeyboardInterrupt:
-                safe_print(f"\n{RED}[!] CTRL+C Detected: Forcing termination of ongoing downloads...{OFF}")
-                os._exit(1)
-            except Exception as e:
-                logger.error(f"{RED}[!] Thread Execution Exception: {e}{OFF}")
+                        parse = self.client.get_track_url(i["id"], fmt_id=self.quality)
+                    except Exception as e:
+                        safe_print(f"{RED}[!] API Error for track {i.get('track_number', 'unknown')} (ID: {i['id']}): {e}{OFF}")
+                        safe_print(f"{YELLOW}[*] Skipping track and continuing with the album...{OFF}")
+                        count += 1
+                        failed_tracks += 1
+                        continue
+
+                    if "sample" not in parse and parse["sampling_rate"]:
+                        is_mp3 = True if int(self.quality) == 5 else False
+                        futures.append(
+                            executor.submit(
+                                self._download_and_tag, dirn, count, parse, i, album_meta, False,
+                                is_mp3, i.get("media_number") if is_multiple else None, is_parallel=is_parallel
+                            )
+                        )
+                    else:
+                        logger.info(f"{OFF}Demo. Skipping")
+                        failed_tracks += 1
+                    count += 1
+                    
+                try:
+                    for f in futures:
+                        while not f.done():
+                            if abort_event.is_set():
+                                break
+                            time.sleep(0.2)
+                            
+                    if not abort_event.is_set():
+                        for f in futures:
+                            try:
+                                res = f.result()
+                                if res is False:
+                                    failed_tracks += 1
+                            except Exception as inner_e:
+                                safe_print(f"{RED}[!] Track download failed: {inner_e}{OFF}")
+                                failed_tracks += 1
+                except (KeyboardInterrupt, SystemExit):
+                    abort_event.set()
+                    aborted_by_user = True
+                    safe_print(f"\n{RED}[!] CTRL+C Intercepted: Securing files and folders...{OFF}")
+                    
+            if not aborted_by_user:
+                _clean_embed_art(dirn, self.settings)
+                if getattr(self, 'fetch_lyrics', False) and not self.no_credits:
+                    self._append_lyrics_to_booklet(dirn, album_title)
+                    
+        except (KeyboardInterrupt, SystemExit):
+            abort_event.set()
+            aborted_by_user = True
+            safe_print(f"\n{RED}[!] CTRL+C Intercepted: Securing files and folders...{OFF}")
             
-        _clean_embed_art(dirn, self.settings)
+        finally:
+            # Restore original signal handler so the CLI functions normally afterwards
+            try:
+                if original_sigint:
+                    signal.signal(signal.SIGINT, original_sigint)
+            except Exception:
+                pass
+                
+        if aborted_by_user:
+            # Crucial: Wait for threads to drop OS file locks before attempting folder rename
+            time.sleep(1.5)
+            
+        # --- FINAL DIRECTORY STATE EVALUATION ---
+        if is_standard_album and working_dirn == inprogress_dirn:
+            final_dirn = target_dirn if (failed_tracks == 0 and not aborted_by_user) else incomplete_dirn
+            try:
+                os.rename(working_dirn, final_dirn)
+            except OSError as e:
+                logger.warning(f"{YELLOW}[!] Could not rename final folder state (OS Lock might still be active). ({e}){OFF}")
+                final_dirn = working_dirn
+            
+            if aborted_by_user:
+                safe_print(f"{YELLOW}[!] Download aborted. Folder successfully marked as [INCOMPLETE].{OFF}")
+            elif failed_tracks > 0:
+                safe_print(f"\n{YELLOW}[!] Album downloaded partially ({failed_tracks} tracks skipped). Folder marked as [INCOMPLETE].{OFF}")
+        else:
+            final_dirn = working_dirn
         
-        # --- NEW: APPEND LYRICS TO BOOKLET ---
-        if getattr(self, 'fetch_lyrics', False) and not self.no_credits:
-            self._append_lyrics_to_booklet(dirn, album_title)
-        # -------------------------------------
-        
+        if aborted_by_user:
+            os._exit(1)
+            
         handle_download_id(db_path=self.download_db, item_id=self.item_id, add_id=True, media_type="album",
                            quality=self.quality, file_format=file_format, quality_met=quality_met,
-                           bit_depth=bit_depth, sampling_rate=sampling_rate, saved_path=dirn,
+                           bit_depth=bit_depth, sampling_rate=sampling_rate, saved_path=final_dirn,
                            url=url, release_date=release_date)
         safe_print(f"{GREEN}Completed{OFF}")
 
@@ -302,11 +376,8 @@ class Download:
         if "sample" not in parse and parse["sampling_rate"]:
             track_meta = self.client.get_track_meta(self.item_id)
             
-            
-            # --- START PLAYLIST FIX: OVERRIDE TRACK NUMBER ---
             if getattr(self, 'is_playlist', False) and getattr(self, 'playlist_track_number', None):
                 track_meta["track_number"] = self.playlist_track_number
-            # -------------------------------------------------
             
             track_title = _get_title(track_meta)
             artist = _safe_get(track_meta, "performer", "name")
@@ -332,9 +403,7 @@ class Download:
             dirn = process_folder_format_with_subdirs(self.folder_format, track_attr, self.path)
             os.makedirs(dirn, exist_ok=True)
 
-            # --- START PLAYLIST COVER FIX ---
             if getattr(self, 'is_playlist', False):
-                # Skip saving the generic cover.jpg to avoid cluttering the folder with 50 different images
                 logger.info(f"{OFF}Skipping standard cover save to keep playlist folder clean")
             elif self.settings.no_cover:
                 logger.info(f"{OFF}Skipping cover")
@@ -342,7 +411,6 @@ class Download:
                 _get_extra(track_meta["album"]["image"]["large"], dirn, art_size=self.settings.saved_art_size)
 
             if self.settings.embed_art:
-                # Force remove previous embedded cover to prevent caching issues across tracks
                 embed_path = os.path.join(dirn, EMB_COVER_NAME)
                 if os.path.exists(embed_path):
                     try:
@@ -354,7 +422,6 @@ class Download:
                            art_size=self.settings.embedded_art_size)
             else:
                 logger.info(f"{OFF}Skipping embedded art")
-            # --- END PLAYLIST COVER FIX ---
                 
             is_mp3 = True if int(self.quality) == 5 else False
             
@@ -391,7 +458,7 @@ class Download:
         is_mp3,
         multiple=None,
         is_parallel=False
-    ):
+    ) -> bool:
         extension = ".mp3" if is_mp3 else ".flac"
 
         track_artist = _safe_get(track_metadata, "performer", "name")
@@ -416,14 +483,17 @@ class Download:
 
         if os.path.exists(final_file):
             safe_print(f"{CYAN}[*] Skipping: {os.path.basename(final_file)} (Already exists){OFF}")
-            return 
+            return True
+
+        if abort_event.is_set():
+            return False
 
         time.sleep(1)
         try:
             url = track_url_dict["url"]
         except KeyError:
             logger.info(f"{OFF}Track not available for download")
-            return
+            return False
 
         total_discs = album_or_track_metadata.get('media_count', 1)
         if multiple and total_discs > 1 and (not self.settings.multiple_disc_one_dir):
@@ -454,6 +524,9 @@ class Download:
         final_fmt = int(self.quality)
 
         for attempt_fmt in qualities_to_try:
+            if abort_event.is_set():
+                return False
+                
             if attempt_fmt != int(self.quality):
                 safe_print(f"{YELLOW}[!] Automatic downgrade: Attempting to save in {TIER_NAMES[attempt_fmt]}...{OFF}")
 
@@ -470,6 +543,7 @@ class Download:
                         final_fmt = attempt_fmt
                         break
                     except Exception as e:
+                        if abort_event.is_set(): return False
                         safe_print(f"{YELLOW}[!] Akamai block detected. Activating fallback segmented download...{OFF}")
                         fresh_track_dict = get_fresh_url(force_segments=True)
                 
@@ -484,10 +558,13 @@ class Download:
             except Exception as e:
                 pass
 
-        if not success:
+        if not success and not abort_event.is_set():
             safe_print(f"\n{RED}[!] TRACK {track_no} DEFINITIVELY DISCARDED AFTER ALL DOWNGRADES.{OFF}")
             safe_print(f"{YELLOW}[!] Skipping to the next track...{OFF}\n")
-            return 
+            return False
+            
+        if abort_event.is_set():
+            return False
 
         is_mp3 = True if final_fmt == 5 else False
         extension = ".mp3" if is_mp3 else ".flac"
@@ -495,47 +572,36 @@ class Download:
         tag_function = metadata.tag_mp3 if is_mp3 else metadata.tag_flac
         try:
             tag_function(
-                filename,
-                root_dir,
-                final_file,
-                track_metadata,
-                album_or_track_metadata,
-                is_track,
-                self.embed_art,
-                settings=self.settings,
+                filename, root_dir, final_file, track_metadata,
+                album_or_track_metadata, is_track, self.embed_art, settings=self.settings,
             )
         except Exception as e:
             safe_print(f"{RED}[!] Error tagging: {e}{OFF}")
 
-        if getattr(self, 'fetch_lyrics', False) and hasattr(self, 'lyrics_engine'):
+        if getattr(self, 'fetch_lyrics', False) and hasattr(self, 'lyrics_engine') and not abort_event.is_set():
             search_artist = _safe_get(track_metadata, "performer", "name") or _safe_get(album_or_track_metadata, "artist", "name", default="Unknown")
             search_album = _safe_get(track_metadata, "album", "title", default="")
             
             with print_lock:
                 self.lyrics_engine.fetch_and_inject(
-                    file_path=final_file,
-                    artist=search_artist,
-                    track=track_title,
-                    album=search_album
+                    file_path=final_file, artist=search_artist, track=track_title, album=search_album
                 )
 
         delay_time = getattr(self.settings, 'delay', 0)
         if delay_time == 0 and '--delay' in sys.argv:
-            try:
-                delay_time = int(sys.argv[sys.argv.index('--delay') + 1])
+            try: delay_time = int(sys.argv[sys.argv.index('--delay') + 1])
             except: pass
             
-        if delay_time > 0:
+        if delay_time > 0 and not abort_event.is_set():
             safe_print(f"{YELLOW}[*] Sleeping for {delay_time} seconds to prevent rate limiting...{OFF}")
             time.sleep(delay_time)
+            
+        return True
 
     @staticmethod
     def _get_filename_attr(track_artist, track_metadata: dict, album_metadata: dict):     
-        
-        # Funzione helper per appiattire la lista degli artisti per i nomi dei file/cartelle
         def _flatten_artists(artist_data):
-            if isinstance(artist_data, list):
-                return ", ".join(artist_data)
+            if isinstance(artist_data, list): return ", ".join(artist_data)
             return str(artist_data) if artist_data else ""
            
         album_artist_raw = get_album_artist(album_metadata)
@@ -568,11 +634,8 @@ class Download:
     @staticmethod
     def _get_track_attr(meta, track_title, bit_depth, sampling_rate, file_format):
         album_meta = meta.get("album", {})
-        
-        # Funzione helper per appiattire la lista degli artisti per i nomi dei file/cartelle
         def _flatten_artists(artist_data):
-            if isinstance(artist_data, list):
-                return ", ".join(artist_data)
+            if isinstance(artist_data, list): return ", ".join(artist_data)
             return str(artist_data) if artist_data else ""
             
         album_artist_raw = get_album_artist(album_meta)
@@ -607,17 +670,13 @@ class Download:
             "track_count": meta.get("track_count", ""),
             "ExplicitFlag": "[E]" if album_meta.get("parental_warning") else "",
             "explicit": "[E]" if album_meta.get("parental_warning") else "",
-            # --- FIX ISSUE #216 ---
             "release_type": format_release_type(album_meta.get("release_type")),
         }
 
     @staticmethod
     def _get_album_attr(meta, album_title, file_format, bit_depth, sampling_rate):
-        
-        # Funzione helper per appiattire la lista degli artisti per i nomi dei file/cartelle
         def _flatten_artists(artist_data):
-            if isinstance(artist_data, list):
-                return ", ".join(artist_data)
+            if isinstance(artist_data, list): return ", ".join(artist_data)
             return str(artist_data) if artist_data else ""
             
         album_artist_raw = get_album_artist(meta)
@@ -649,7 +708,6 @@ class Download:
             "track_count": meta.get("track_count", 1),
             "ExplicitFlag": "[E]" if meta.get("parental_warning") else "",
             "explicit": "[E]" if meta.get("parental_warning") else "",
-            # --- FIX ISSUE #216 ---
             "release_type": format_release_type(meta.get("release_type")),
         }
 
@@ -735,7 +793,7 @@ class Download:
         import re
         import textwrap
         
-        if self.no_credits:
+        if self.no_credits or abort_event.is_set():
             return
         
         safe_title = sanitize_filename(album_title)
@@ -756,8 +814,7 @@ class Download:
             with open(tracklist_path, "w", encoding="utf-8") as f:
                 f.write("=" * 70 + "\n")
                 f.write(f"ALBUM      : {album_title}\n")
-                if composer != "N/A":
-                    f.write(f"COMPOSER   : {composer}\n")
+                if composer != "N/A": f.write(f"COMPOSER   : {composer}\n")
                 f.write(f"MAIN ART.  : {artist_name}\n")
                 f.write(f"LABEL      : {label}\n")
                 f.write(f"GENRE      : {genre}\n")
@@ -772,47 +829,34 @@ class Download:
                 for track in tracks:
                     disc_num = track.get("media_number", 1)
                     if total_discs > 1 and disc_num != current_disc:
-                        if current_disc is not None:
-                            f.write("\n")
+                        if current_disc is not None: f.write("\n")
                         f.write(f"--- DISC {disc_num} ---\n\n")
                         current_disc = disc_num
 
                     t_num = str(track.get("track_number", 0)).zfill(2)
                     t_title = track.get("title", "Unknown Title")
-                    
                     duration = int(track.get("duration", 0))
                     mins, secs = divmod(duration, 60)
                     dur_str = f"[{mins:02}:{secs:02}]"
                     
-                    track_header = f"{t_num}. {t_title}"
-                    f.write(f"{track_header:<60} {dur_str}\n")
+                    f.write(f"{f'{t_num}. {t_title}':<60} {dur_str}\n")
                     
                     performers_raw = track.get("performers", "")
                     if performers_raw:
-                        perf_lines = re.split(r'\r?\n|\s+-\s+', str(performers_raw))
-                        for line in perf_lines:
-                            if line.strip():
-                                f.write(f"    * {line.strip()}\n")
+                        for line in re.split(r'\r?\n|\s+-\s+', str(performers_raw)):
+                            if line.strip(): f.write(f"    * {line.strip()}\n")
                     else:
                         t_artist = _safe_get(track, "performer", "name", default=artist_name)
                         f.write(f"    {t_artist}\n")
-                    
                     f.write("\n")
                 
                 description = meta.get("description")
                 if description:
-                    f.write("\n" + "=" * 70 + "\n")
-                    f.write("ALBUM REVIEW / NOTES\n")
-                    f.write("=" * 70 + "\n\n")
-                    
-                    clean_desc = re.sub(r'<br\s*/?>', '\n', str(description))
-                    clean_desc = re.sub(r'<[^<]+>', '', clean_desc)
-                    
-                    paragraphs = clean_desc.split('\n')
-                    for p in paragraphs:
+                    f.write("\n" + "=" * 70 + "\nALBUM REVIEW / NOTES\n" + "=" * 70 + "\n\n")
+                    clean_desc = re.sub(r'<[^<]+>', '', re.sub(r'<br\s*/?>', '\n', str(description)))
+                    for p in clean_desc.split('\n'):
                         if p.strip():
-                            wrapped_paragraph = textwrap.fill(p.strip(), width=70)
-                            f.write(wrapped_paragraph + "\n\n")
+                            f.write(textwrap.fill(p.strip(), width=70) + "\n\n")
 
             safe_print(f"{GREEN}  L Completed: Digital Booklet.txt (Credits & Review){OFF}")
         except Exception as e:
@@ -820,56 +864,33 @@ class Download:
 
     def _append_lyrics_to_booklet(self, dirn, album_title):
         import re
+        if abort_event.is_set(): return
         
         safe_title = sanitize_filename(album_title)
         tracklist_path = os.path.join(dirn, f"{safe_title} - Tracklist.txt")
-        
-        # Abort if the booklet does not exist
-        if not os.path.isfile(tracklist_path):
-            return
+        if not os.path.isfile(tracklist_path): return
             
-        # Find all audio files recursively (supports multi-disc subfolders)
         audio_files = []
         for root, _, files in os.walk(dirn):
             for f in files:
                 if f.lower().endswith(('.flac', '.mp3')):
                     audio_files.append(os.path.join(root, f))
                     
-        # Alphabetical order respects track order (CD 01, CD 02, etc. and 01, 02 track nums)
         audio_files.sort()
         lyrics_to_append = []
         
         for audio_path in audio_files:
-            # Estrarre il percorso base (senza estensione) per trovare i file testo
             base_path = os.path.splitext(audio_path)[0]
-            lrc_path = f"{base_path}.lrc"
-            txt_path = f"{base_path}.txt" 
+            lrc_path, txt_path = f"{base_path}.lrc", f"{base_path}.txt" 
             base_name = os.path.basename(base_path)
-            
             lyrics_text = ""
             
-            # Case 1: Synchronized Lyrics (.lrc)
             if os.path.exists(lrc_path):
                 with open(lrc_path, "r", encoding="utf-8") as f:
                     raw_lyrics = f.read()
-                    
-                # A. Strip Metadata Tags (e.g., [ti:Title], [ar:Artist])
-                clean_lyrics = re.sub(r'\[[a-zA-Z]+:.*?\]\n?', '', raw_lyrics)
-                # B. Strip exact Timings (e.g., [00:12.34] or [00:12.345])
-                clean_lyrics = re.sub(r'\[\d{2,}:\d{2}\.\d{2,3}\]', '', clean_lyrics)
-                
-                # C. Smart line break cleanup (keeps paragraphs/stanzas, removes multiple blank lines)
-                clean_lines = []
-                for line in clean_lyrics.splitlines():
-                    stripped = line.strip()
-                    if stripped:
-                        clean_lines.append(stripped)
-                    elif clean_lines and clean_lines[-1] != "":
-                        clean_lines.append("")
-                
+                clean_lyrics = re.sub(r'\[[a-zA-Z]+:.*?\]\n?|\[\d{2,}:\d{2}\.\d{2,3}\]', '', raw_lyrics)
+                clean_lines = [line.strip() for line in clean_lyrics.splitlines() if line.strip() or (lyrics_text and lyrics_text[-1] != "")]
                 lyrics_text = "\n".join(clean_lines).strip()
-                
-            # Case 2: Fallback to Unsynchronized Lyrics (.txt), ignoring the booklet itself
             elif os.path.exists(txt_path) and "Tracklist" not in txt_path:
                 with open(txt_path, "r", encoding="utf-8") as f:
                     lyrics_text = f.read().strip()
@@ -877,15 +898,11 @@ class Download:
             if lyrics_text:
                 lyrics_to_append.append(f"--- {base_name} ---\n\n{lyrics_text}\n\n")
                 
-        # If at least one lyric text was found, open the booklet in append mode ("a")
         if lyrics_to_append:
             try:
                 with open(tracklist_path, "a", encoding="utf-8") as f:
-                    f.write("\n" + "=" * 70 + "\n")
-                    f.write("ALBUM LYRICS\n")
-                    f.write("=" * 70 + "\n\n")
-                    for l in lyrics_to_append:
-                        f.write(l)
+                    f.write("\n" + "=" * 70 + "\nALBUM LYRICS\n" + "=" * 70 + "\n\n")
+                    f.writelines(lyrics_to_append)
                 safe_print(f"{CYAN}[+] Lyrics cleanly formatted and appended to Digital Booklet.{OFF}")
             except Exception as e:
                 logger.error(f"{RED}[!] Error appending lyrics to booklet: {e}{OFF}")
@@ -897,10 +914,8 @@ def _get_description(item: dict, track_title, multiple=None):
     return downloading_title
 
 def tqdm_download(url_or_callable, fname, track_name, is_parallel=False):
-    G = "\033[92m"
-    Y = "\033[93m"
-    C = "\033[96m"
-    O = "\033[0m"
+    if abort_event.is_set(): return
+    G, Y, C, O = "\033[92m", "\033[93m", "\033[96m", "\033[0m"
 
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -922,6 +937,7 @@ def tqdm_download(url_or_callable, fname, track_name, is_parallel=False):
     backoff_delays = [2, 4, 8, 16, 32] 
 
     for attempt in range(max_retries):
+        if abort_event.is_set(): return
         try:
             url = url_or_callable() if callable(url_or_callable) else url_or_callable
 
@@ -947,21 +963,16 @@ def tqdm_download(url_or_callable, fname, track_name, is_parallel=False):
                     safe_print(f"{C}[+] In progress: {track_name} [{size_mb:.1f} MB]{O}")
 
                 with open(fname, mode) as file, tqdm(
-                    total=total_size,
-                    unit="iB",
-                    unit_scale=True,
-                    unit_divisor=1024,
-                    desc=tqdm_desc,
-                    initial=downloaded_size,
-                    bar_format=b_format,
-                    leave=False,
-                    disable=is_parallel
+                    total=total_size, unit="iB", unit_scale=True, unit_divisor=1024,
+                    desc=tqdm_desc, initial=downloaded_size, bar_format=b_format, leave=False, disable=is_parallel
                 ) as bar:
                     for data in r.iter_content(chunk_size=65536):
+                        if abort_event.is_set(): return
                         if data:
                             size = file.write(data)
                             downloaded_size += size
-                            bar.update(size)
+                            if not is_parallel:
+                                bar.update(size)
             
             if downloaded_size >= total_size:
                 safe_print(f"{G}  L Completed: {track_name}{O}")
@@ -973,11 +984,10 @@ def tqdm_download(url_or_callable, fname, track_name, is_parallel=False):
                 safe_print(f"\n{Y}[!] Server block. Retrying in {wait}s ({attempt+1}/{max_retries})...{O}")
                 time.sleep(wait)
             else:
-                if os.path.exists(fname):
-                    os.remove(fname)
+                if os.path.exists(fname): os.remove(fname)
                 raise Exception("Definitive timeout")
 
-    if downloaded_size < total_size:
+    if downloaded_size < total_size and not abort_event.is_set():
         if os.path.exists(fname): os.remove(fname)
         raise Exception("Incomplete download")
 
@@ -985,23 +995,18 @@ def _get_title(item_dict):
     item_title = item_dict.get("title")
     version = item_dict.get("version")
     if version:
-        item_title = (
-            f"{item_title} ({version})"
-            if version.lower() not in item_title.lower()
-            else item_title
-        )
+        item_title = f"{item_title} ({version})" if version.lower() not in item_title.lower() else item_title
     return item_title
 
 
 def _get_extra(item, dirn, extra="cover.jpg", art_size=None, og_quality=False):
+    if abort_event.is_set(): return
     extra_file = os.path.join(dirn, extra)
     if os.path.isfile(extra_file):
         logger.info(f"{OFF}{extra} was already downloaded")
         return
         
-    if og_quality:
-        art_size = "org"
-
+    if og_quality: art_size = "org"
     if art_size in ["50", "100", "150", "300", "600", "max", "org"]:
         item = item.replace("_600.", f"_{art_size}.")
         
@@ -1033,9 +1038,8 @@ def _safe_get(d: dict, *keys, default=None):
     return res
 
 def tqdm_download_segments(track_url_dict, fname, track_name, is_parallel=False):
-    G = "\033[92m"
-    O = "\033[0m" 
-    C = "\033[96m"
+    if abort_event.is_set(): return
+    G, C, O = "\033[92m", "\033[96m", "\033[0m" 
     
     tmp_fname = fname + ".mp4"
     n_segments = track_url_dict["n_segments"]
@@ -1043,41 +1047,40 @@ def tqdm_download_segments(track_url_dict, fname, track_name, is_parallel=False)
     raw_key = track_url_dict["raw_key"]
 
     def get_seg_size(seg_num):
+        if abort_event.is_set(): return 0
         url = url_template.replace("$SEGMENT$", str(seg_num))
         try:
             r = requests.head(url, timeout=5)
             return int(r.headers.get("content-length", 0))
-        except:
-            return 0
+        except: return 0
 
     total_size = 0
     with ThreadPoolExecutor(max_workers=8) as ex:
         futures_size = [ex.submit(get_seg_size, i) for i in range(n_segments + 1)]
-        try:
-            for f in futures_size:
-                while not f.done():
-                    time.sleep(0.1)
-                total_size += f.result()
-        except KeyboardInterrupt:
-            os._exit(1)
+        for f in futures_size:
+            while not f.done():
+                if abort_event.is_set(): return
+                time.sleep(0.1)
+            total_size += f.result()
 
     if is_parallel:
         size_mb = total_size / (1024 * 1024)
         safe_print(f"{C}[+] In progress: {track_name} [{size_mb:.1f} MB]{O}")
-        tqdm_desc = ""
-        b_format = ""
+        tqdm_desc, b_format = "", ""
     else:
         safe_print(f"{C}[+] In progress: {track_name}{O}")
         tqdm_desc = f" {G}Segmented Download{O}"
         b_format = "{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]"
 
     def fetch_segment_fluid(seg_num):
+        if abort_event.is_set(): return bytearray()
         url = url_template.replace("$SEGMENT$", str(seg_num))
         r = requests.get(url, stream=True, timeout=15)
         r.raise_for_status()
         seg_data = bytearray()
         
         for chunk in r.iter_content(chunk_size=65536):
+            if abort_event.is_set(): return bytearray()
             seg_data.extend(chunk)
             if not is_parallel:
                 bar.update(len(chunk)) 
@@ -1085,40 +1088,33 @@ def tqdm_download_segments(track_url_dict, fname, track_name, is_parallel=False)
 
     try:
         with open(tmp_fname, "wb") as file, tqdm(
-            total=total_size,
-            unit="iB",
-            unit_scale=True,
-            unit_divisor=1024,
-            desc=tqdm_desc,
-            bar_format=b_format,
-            leave=False,
-            disable=is_parallel
+            total=total_size, unit="iB", unit_scale=True, unit_divisor=1024,
+            desc=tqdm_desc, bar_format=b_format, leave=False, disable=is_parallel
         ) as bar:
 
             segment_uuid = None
             for i in range(2):
                 seg_data = fetch_segment_fluid(i)
+                if abort_event.is_set(): return
                 if i == 1:
                     segment_uuid = _get_qobuz_segment_uuid(seg_data)
                     if segment_uuid is None:
                         raise ConnectionError(f"Cannot find segment UUID for {fname}")
 
-                decrypted = _decrypt_qobuz_segment(seg_data, raw_key, segment_uuid)
-                file.write(decrypted)
+                file.write(_decrypt_qobuz_segment(seg_data, raw_key, segment_uuid))
 
             if n_segments >= 2:
                 with ThreadPoolExecutor(max_workers=8) as executor:
                     futures_seg = [executor.submit(fetch_segment_fluid, i) for i in range(2, n_segments + 1)]
-                    try:
-                        for f in futures_seg:
-                            while not f.done():
-                                time.sleep(0.2)
-                            seg_data = f.result()
-                            decrypted = _decrypt_qobuz_segment(seg_data, raw_key, segment_uuid)
-                            file.write(decrypted)
-                    except KeyboardInterrupt:
-                        os._exit(1)
+                    for f in futures_seg:
+                        while not f.done():
+                            if abort_event.is_set(): return
+                            time.sleep(0.2)
+                        seg_data = f.result()
+                        if not abort_event.is_set():
+                            file.write(_decrypt_qobuz_segment(seg_data, raw_key, segment_uuid))
 
+        if abort_event.is_set(): return
         if not is_parallel:
             safe_print(f" {G}  > Assembling the final FLAC file...{O}")
             
@@ -1130,15 +1126,15 @@ def tqdm_download_segments(track_url_dict, fname, track_name, is_parallel=False)
 
     finally:
         if os.path.isfile(tmp_fname):
-            os.remove(tmp_fname)
+            try: os.remove(tmp_fname)
+            except OSError: pass
 
 
 def _get_qobuz_segment_uuid(segment_data):
     pos = 0
     while pos + 24 <= len(segment_data):
         size = int.from_bytes(segment_data[pos : pos + 4], "big")
-        if size <= 0 or pos + size > len(segment_data):
-            break
+        if size <= 0 or pos + size > len(segment_data): break
 
         if bytes(segment_data[pos + 4 : pos + 8]) == b"uuid":
             return bytes(segment_data[pos + 8 : pos + 24])
@@ -1147,20 +1143,15 @@ def _get_qobuz_segment_uuid(segment_data):
 
 
 def _decrypt_qobuz_segment(segment_data, raw_key, segment_uuid):
-    if segment_uuid is None:
-        return bytes(segment_data)
+    if segment_uuid is None: return bytes(segment_data)
 
     buf = bytearray(segment_data)
     pos = 0
     while pos + 8 <= len(buf):
         size = int.from_bytes(buf[pos : pos + 4], "big")
-        if size <= 0 or pos + size > len(buf):
-            break
+        if size <= 0 or pos + size > len(buf): break
 
-        if (
-            bytes(buf[pos + 4 : pos + 8]) == b"uuid"
-            and bytes(buf[pos + 8 : pos + 24]) == segment_uuid
-        ):
+        if bytes(buf[pos + 4 : pos + 8]) == b"uuid" and bytes(buf[pos + 8 : pos + 24]) == segment_uuid:
             pointer = pos + 28
             data_end = pos + int.from_bytes(buf[pointer : pointer + 4], "big")
             pointer += 4
@@ -1174,41 +1165,33 @@ def _decrypt_qobuz_segment(segment_data, raw_key, segment_uuid):
                 pointer += 6
                 flags = int.from_bytes(buf[pointer : pointer + 2], "big")
                 pointer += 2
-                frame_start = data_end
-                frame_end = frame_start + frame_len
-                data_end = frame_end
+                frame_start, data_end = data_end, data_end + frame_len
 
                 if flags:
-                    counter = bytes(buf[pointer : pointer + counter_len]) + (
-                        b"\x00" * (16 - counter_len)
-                    )
-                    decryptor = Cipher(
-                        algorithms.AES(raw_key), modes.CTR(counter)
-                    ).decryptor()
-                    buf[frame_start:frame_end] = decryptor.update(
-                        bytes(buf[frame_start:frame_end])
-                    ) + decryptor.finalize()
+                    counter = bytes(buf[pointer : pointer + counter_len]) + (b"\x00" * (16 - counter_len))
+                    decryptor = Cipher(algorithms.AES(raw_key), modes.CTR(counter)).decryptor()
+                    buf[frame_start:data_end] = decryptor.update(bytes(buf[frame_start:data_end])) + decryptor.finalize()
                 pointer += counter_len
         pos += size
     return bytes(buf)
 
 def _download_goodies(album_meta, dirn):
+    if abort_event.is_set(): return
     try:
         for goody in album_meta.get("goodies", []):
-            if not goody.get("url"):
-                logger.warning("No URL found for the goody, skipping.")
-                continue
+            if abort_event.is_set(): break
+            if not goody.get("url"): continue
             goody_name = sanitize_filename(clean_filename(f'{album_meta.get("title")} ({goody.get("id")}).pdf'))
             _get_extra(goody.get("url"), dirn, extra=goody_name)
-    except:
-        logger.error(f"{RED}Error downloading goodies", exc_info=True)
+    except Exception as e:
+        logger.error(f"{RED}Error downloading goodies: {e}", exc_info=True)
 
 
 def _clean_embed_art(dirn, settings=None):
     embed_file = os.path.join(dirn, EMB_COVER_NAME)
     if os.path.exists(embed_file):
         try:
-            time.sleep(0.5) # Ensures metadata taggers release the file on Windows
+            time.sleep(0.5) 
             os.remove(embed_file)
-        except Exception:
+        except OSError:
             pass
