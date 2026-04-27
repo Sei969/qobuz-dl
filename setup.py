@@ -23,7 +23,7 @@ requirements = [
 setup(
     name=pkg_name,
     # 2. VERSION RESET FOR YOUR RELEASE
-    version="1.9.1",  
+    version="2.0",  
     # 3. AUTHOR INFO
     author="Riccardo (Sei969)",
     author_email="Sei969@users.noreply.github.com",
