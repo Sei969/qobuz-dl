@@ -68,6 +68,14 @@ Never miss a new release from your tracked artists. The new `radar` command seam
 * **Fuzzy Qobuz Matching:** Queries the Qobuz database to find the exact high-resolution matches for your daily new releases.
 * **Interactive Checkbox UI:** Presents a clean, interactive terminal menu where you can multi-select (`Spacebar`) the fresh releases and instantly inject them into your Qobuz Favorites (`Enter`), ready to be downloaded later via the `fun` mode.
 
+### 🛡️ Fail-Safe Folder Management & Smart Resume
+Say goodbye to messy libraries and corrupted downloads. The downloader now features a dynamic 3-stage folder state system to keep your music library perfectly organized:
+* **`[IN PROGRESS]`**: Folders are marked while the download is actively running.
+* **`[INCOMPLETE]`**: If you abort the process (graceful `CTRL+C` handling) or if some tracks are skipped (e.g., geo-blocked or unavailable), the folder is safely marked as incomplete. 
+* **Clean State**: Only when an album is downloaded with **100% success** will the folder be renamed to its final, clean state (e.g., `Artist - Album`).
+
+*Note: The engine is smart enough to seamlessly resume downloads directly into `[INCOMPLETE]` or `[IN PROGRESS]` folders on your next run!*
+
 ## 📥 Installation & Setup
 
 > ⚠️ **Requirement:** You need an **active subscription** to Qobuz.
