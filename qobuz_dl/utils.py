@@ -36,44 +36,79 @@ class PartialFormatter(string.Formatter):
                 return self.bad_fmt
             raise
 
-def make_m3u(pl_directory):
+def make_m3u(pl_directory, remote_items=None):
+    """
+    Generates a .m3u playlist file.
+    If remote_items (Qobuz API playlist order) is provided, it matches the files
+    by QOBUZTRACKID to preserve the exact online order, ignoring filenames.
+    """
     track_list = ["#EXTM3U"]
     rel_folder = os.path.basename(os.path.normpath(pl_directory))
     pl_name = rel_folder + ".m3u"
     pl_full_path = os.path.join(pl_directory, pl_name)
 
-    def natural_sort_key(s):
-        return [int(text) if text.isdigit() else text.lower() for text in re.split(r'(\d+)', s)]
-
+    # 1. Scansiona la cartella locale e mappa i file tramite il loro QOBUZTRACKID
+    local_tracks = {}
     for local, dirs, files in os.walk(pl_directory):
         dirs.sort()
+        for f in files:
+            if os.path.splitext(f)[-1].lower() in EXTENSIONS:
+                audio_full_path = os.path.abspath(os.path.join(local, f))
+                try:
+                    pl_item = (
+                        EasyMP3(audio_full_path)
+                        if audio_full_path.lower().endswith(".mp3")
+                        else FLAC(audio_full_path)
+                    )
+                    
+                    track_id = None
+                    if audio_full_path.lower().endswith('.flac'):
+                        track_id = pl_item.get("QOBUZTRACKID", [None])[0]
+                    else:
+                        txxx = pl_item.get("TXXX:QOBUZTRACKID")
+                        if txxx:
+                            track_id = txxx.text[0]
+                    
+                    if track_id:
+                        local_tracks[str(track_id)] = audio_full_path
+                    else:
+                        local_tracks[audio_full_path] = audio_full_path
+                except Exception as e:
+                    logger.error(f"Error reading tags for {f}: {e}")
 
-        audio_files = [
-            f for f in files if os.path.splitext(f)[-1].lower() in EXTENSIONS
-        ]
+    ordered_files = []
 
-        audio_files.sort(key=natural_sort_key)
+    # 2. Se abbiamo l'ordine ufficiale della playlist da Qobuz, usiamo quello
+    if remote_items:
+        for item in remote_items:
+            tid = str(item.get("id"))
+            if tid in local_tracks:
+                ordered_files.append(local_tracks[tid])
+    # 3. Fallback (es. per interi album o assenza di remote_items): ordine naturale
+    else:
+        def natural_sort_key(s):
+            return [int(text) if text.isdigit() else text.lower() for text in re.split(r'(\d+)', s)]
+        ordered_files = sorted(local_tracks.values(), key=natural_sort_key)
 
-        for file_ in audio_files:
-            audio_full_path = os.path.abspath(os.path.join(local, file_))
-            audio_rel_path = os.path.relpath(audio_full_path, pl_directory)
+    # 4. Genera il file .m3u
+    for audio_full_path in ordered_files:
+        audio_rel_path = os.path.relpath(audio_full_path, pl_directory)
+        try:
+            pl_item = (
+                EasyMP3(audio_full_path)
+                if audio_full_path.lower().endswith(".mp3")
+                else FLAC(audio_full_path)
+            )
 
-            try:
-                pl_item = (
-                    EasyMP3(audio_full_path)
-                    if audio_full_path.lower().endswith(".mp3")
-                    else FLAC(audio_full_path)
-                )
+            title = pl_item.get("TITLE", ["Unknown Title"])[0]
+            artist = pl_item.get("ARTIST", ["Unknown Artist"])[0]
+            length = int(pl_item.info.length) if hasattr(pl_item.info, 'length') else 0
 
-                title = pl_item.get("TITLE", ["Unknown Title"])[0]
-                artist = pl_item.get("ARTIST", ["Unknown Artist"])[0]
-                length = int(pl_item.info.length)
-
-                index = f"#EXTINF:{length}, {artist} - {title}\n{audio_rel_path}"
-                track_list.append(index)
-            except Exception as e:
-                logger.error(f"Error processing {file_}: {e}")
-                continue
+            index = f"#EXTINF:{length}, {artist} - {title}\n{audio_rel_path}"
+            track_list.append(index)
+        except Exception as e:
+            logger.error(f"Error processing {audio_full_path}: {e}")
+            continue
 
     if len(track_list) > 1:
         with open(pl_full_path, "w", encoding="utf-8") as pl:

@@ -150,6 +150,14 @@ def _handle_commands(qobuz, arguments):
     try:
         if arguments.command == "dl":
             qobuz.download_list_of_urls(arguments.SOURCE)
+        elif arguments.command in ("sync-playlist", "sp"):
+            from qobuz_dl.sync_playlist import sync_playlist
+            sync_playlist(
+                qobuz,
+                arguments.URL,
+                arguments.FOLDER,
+                auto_confirm=arguments.yes,
+            )
         elif arguments.command == "lucky":
             query = " ".join(arguments.QUERY)
             qobuz.lucky_type = arguments.type

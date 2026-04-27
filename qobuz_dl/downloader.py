@@ -468,10 +468,16 @@ class Download:
             album_or_track_metadata.get("album", {}) if is_track else album_or_track_metadata
         )
 
-        if multiple and self.settings.multiple_disc_one_dir:
+        # --- FIX MARROBHD & SYNC-PLAYLIST: CLEAN PLAYLIST NAMING ---
+        if getattr(self, 'is_playlist', False):
+            # Forza un nome file pulito senza numero traccia per le playlist
+            clean_playlist_format = "{artist} - {track_title}"
+            formatted_path = sanitize_filename(clean_filename(clean_playlist_format.format(**filename_attr)), replacement_text="_")
+        elif multiple and self.settings.multiple_disc_one_dir:
             formatted_path = sanitize_filename(clean_filename(self.settings.multiple_disc_track_format.format(**filename_attr)), replacement_text="_")
         else:
             formatted_path = sanitize_filename(clean_filename(self.track_format.format(**filename_attr)), replacement_text="_")
+        # -----------------------------------------------------------
             
         max_len = 180
         if len(formatted_path) > max_len:
