@@ -1,8 +1,8 @@
+import sys
 import configparser
 import logging
 import glob
 import os
-import sys
 import getpass
 import hashlib
 import signal
@@ -143,7 +143,7 @@ def _handle_commands(qobuz, arguments):
             _remove_leftovers(qobuz.directory)
         except Exception:
             pass
-        os._exit(1)
+        sys.exit(1)
         
     signal.signal(signal.SIGINT, sigint_handler)
 
