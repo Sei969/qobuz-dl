@@ -6,6 +6,7 @@ import subprocess
 import time
 import unicodedata
 
+from qobuz_dl.color import GREEN, RED, YELLOW, CYAN, OFF
 from mutagen.mp3 import EasyMP3
 from mutagen.flac import FLAC
 
@@ -109,45 +110,46 @@ def make_m3u(pl_directory, remote_items=None):
 
     # 2. Match with Qobuz API order (4-Pass Algorithm)
     if remote_items:
-        available_files = local_files_info.copy()
+        by_tid = {str(f['qobuz_id']): f for f in local_files_info if f['qobuz_id']}
+        by_isrc = {str(f['isrc']): f for f in local_files_info if f['isrc']}
+        by_title = {str(f['title']).strip().lower(): f for f in local_files_info if f['title']}
+
+        missing_count = 0
+        table_header = (
+            f"\n{RED}{'━'*80}\n"
+            f"{YELLOW}{'MISSING LOCAL TRACKS':^80}\n"
+            f"{RED}{'━'*80}{OFF}\n"
+            f"{CYAN}{'TITLE':<35} │ {'ARTIST':<25} │ {'ID':<12}{OFF}\n"
+            f"{'─'*80}"
+        )
+
         for item in remote_items:
             tid = str(item.get("id", ""))
             isrc = str(item.get("isrc", ""))
-            title = str(item.get("title", "")).strip().lower()
-            
-            best_match = None
-            
-            # Pass 1: exact QOBUZTRACKID
-            if tid:
-                for f_info in available_files:
-                    if str(f_info['qobuz_id']) == tid:
+            track_title = item.get("title", "Unknown Title")
+            performer_name = item.get("performer", {}).get("name", "Unknown Performer")
+
+            # Matching logic (Pass 1-4)
+            best_match = by_tid.get(tid) or by_isrc.get(isrc) or by_title.get(track_title.lower())
+
+            if not best_match:
+                for f_info in local_files_info:
+                    if track_title.lower() in os.path.basename(f_info['path']).lower():
                         best_match = f_info
                         break
-            
-            # Pass 2: exact ISRC
-            if not best_match and isrc:
-                for f_info in available_files:
-                    if str(f_info['isrc']) == isrc:
-                        best_match = f_info
-                        break
-                        
-            # Pass 3: Title match
-            if not best_match and title:
-                for f_info in available_files:
-                    if str(f_info['title']).strip().lower() == title:
-                        best_match = f_info
-                        break
-                        
-            # Pass 4: Filename contains title
-            if not best_match and title:
-                for f_info in available_files:
-                    if title in os.path.basename(f_info['path']).lower():
-                        best_match = f_info
-                        break
-            
+
             if best_match:
                 ordered_files.append(best_match)
-                available_files.remove(best_match) # Avoid duplicates
+            else:
+                if missing_count == 0:
+                    logger.warning(table_header)
+
+                row = f"{track_title[:35]:<35} │ {performer_name[:25]:<25} │ {tid:<12}"
+                logger.warning(f"{YELLOW}{row}{OFF}")
+                missing_count += 1
+
+        if missing_count > 0:
+            logger.warning(f"{RED}{'━'*80}{OFF}\n")
 
     # 3. Fallback (Albums or failed matching): Natural sort
     if not remote_items or len(ordered_files) == 0:
