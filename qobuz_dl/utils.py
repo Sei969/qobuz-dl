@@ -40,75 +40,132 @@ def make_m3u(pl_directory, remote_items=None):
     """
     Generates a .m3u playlist file.
     If remote_items (Qobuz API playlist order) is provided, it matches the files
-    by QOBUZTRACKID to preserve the exact online order, ignoring filenames.
+    using a robust 4-pass algorithm (ID -> ISRC -> Title -> Filename) to preserve 
+    the exact online order, ignoring physical filenames.
     """
+    import os
+    import re
+    import logging
+    from mutagen.id3 import ID3
+    from mutagen.flac import FLAC
+    from mutagen import File
+    
+    logger = logging.getLogger(__name__)
+    EXTENSIONS = (".mp3", ".flac")
+
     track_list = ["#EXTM3U"]
     rel_folder = os.path.basename(os.path.normpath(pl_directory))
     pl_name = rel_folder + ".m3u"
     pl_full_path = os.path.join(pl_directory, pl_name)
 
-    # 1. Scansiona la cartella locale e mappa i file tramite il loro QOBUZTRACKID
-    local_tracks = {}
+    # 1. Scan the local folder and extract deep tags
+    local_files_info = []
     for local, dirs, files in os.walk(pl_directory):
         dirs.sort()
         for f in files:
             if os.path.splitext(f)[-1].lower() in EXTENSIONS:
                 audio_full_path = os.path.abspath(os.path.join(local, f))
+                info = {
+                    'path': audio_full_path, 
+                    'title': '', 
+                    'artist': '', 
+                    'isrc': '', 
+                    'qobuz_id': '',
+                    'duration': 0
+                }
                 try:
-                    pl_item = (
-                        EasyMP3(audio_full_path)
-                        if audio_full_path.lower().endswith(".mp3")
-                        else FLAC(audio_full_path)
-                    )
-                    
-                    track_id = None
+                    # Generic length via mutagen.File
+                    audio_gen = File(audio_full_path)
+                    if audio_gen and audio_gen.info:
+                        info['duration'] = int(audio_gen.info.length)
+
+                    # Deep Tag Parsing
                     if audio_full_path.lower().endswith('.flac'):
-                        track_id = pl_item.get("QOBUZTRACKID", [None])[0]
+                        audio = FLAC(audio_full_path)
+                        info['qobuz_id'] = audio.get("QOBUZTRACKID", [None])[0]
+                        info['isrc'] = audio.get("ISRC", [None])[0]
+                        info['title'] = audio.get("TITLE", [""])[0]
+                        info['artist'] = audio.get("ARTIST", [""])[0]
                     else:
-                        txxx = pl_item.get("TXXX:QOBUZTRACKID")
-                        if txxx:
-                            track_id = txxx.text[0]
-                    
-                    if track_id:
-                        local_tracks[str(track_id)] = audio_full_path
-                    else:
-                        local_tracks[audio_full_path] = audio_full_path
+                        audio = ID3(audio_full_path)
+                        # Correct way to find custom TXXX frames in ID3
+                        for frame in audio.getall("TXXX"):
+                            if frame.desc.upper() == "QOBUZTRACKID":
+                                info['qobuz_id'] = frame.text[0]
+                                break
+                        isrc_frame = audio.get("TSRC")
+                        info['isrc'] = isrc_frame.text[0] if isrc_frame else None
+                        tit2 = audio.get("TIT2")
+                        info['title'] = tit2.text[0] if tit2 else ""
+                        tpe1 = audio.get("TPE1")
+                        info['artist'] = tpe1.text[0] if tpe1 else ""
                 except Exception as e:
-                    logger.error(f"Error reading tags for {f}: {e}")
+                    logger.debug(f"Error reading tags for {f}: {e}")
+                    info['title'] = os.path.splitext(f)[0] # Fallback title
+                
+                local_files_info.append(info)
 
     ordered_files = []
 
-    # 2. Se abbiamo l'ordine ufficiale della playlist da Qobuz, usiamo quello
+    # 2. Match with Qobuz API order (4-Pass Algorithm)
     if remote_items:
+        available_files = local_files_info.copy()
         for item in remote_items:
-            tid = str(item.get("id"))
-            if tid in local_tracks:
-                ordered_files.append(local_tracks[tid])
-    # 3. Fallback (es. per interi album o assenza di remote_items): ordine naturale
-    else:
+            tid = str(item.get("id", ""))
+            isrc = str(item.get("isrc", ""))
+            title = str(item.get("title", "")).strip().lower()
+            
+            best_match = None
+            
+            # Pass 1: exact QOBUZTRACKID
+            if tid:
+                for f_info in available_files:
+                    if str(f_info['qobuz_id']) == tid:
+                        best_match = f_info
+                        break
+            
+            # Pass 2: exact ISRC
+            if not best_match and isrc:
+                for f_info in available_files:
+                    if str(f_info['isrc']) == isrc:
+                        best_match = f_info
+                        break
+                        
+            # Pass 3: Title match
+            if not best_match and title:
+                for f_info in available_files:
+                    if str(f_info['title']).strip().lower() == title:
+                        best_match = f_info
+                        break
+                        
+            # Pass 4: Filename contains title
+            if not best_match and title:
+                for f_info in available_files:
+                    if title in os.path.basename(f_info['path']).lower():
+                        best_match = f_info
+                        break
+            
+            if best_match:
+                ordered_files.append(best_match)
+                available_files.remove(best_match) # Avoid duplicates
+
+    # 3. Fallback (Albums or failed matching): Natural sort
+    if not remote_items or len(ordered_files) == 0:
         def natural_sort_key(s):
             return [int(text) if text.isdigit() else text.lower() for text in re.split(r'(\d+)', s)]
-        ordered_files = sorted(local_tracks.values(), key=natural_sort_key)
+        
+        ordered_files = sorted(local_files_info, key=lambda x: natural_sort_key(os.path.basename(x['path'])))
 
-    # 4. Genera il file .m3u
-    for audio_full_path in ordered_files:
-        audio_rel_path = os.path.relpath(audio_full_path, pl_directory)
-        try:
-            pl_item = (
-                EasyMP3(audio_full_path)
-                if audio_full_path.lower().endswith(".mp3")
-                else FLAC(audio_full_path)
-            )
+    # 4. Generate M3U
+    for f_info in ordered_files:
+        audio_rel_path = os.path.relpath(f_info['path'], pl_directory)
+        
+        disp_title = f_info['title'] or "Unknown Title"
+        disp_artist = f_info['artist'] or "Unknown Artist"
+        length = f_info['duration']
 
-            title = pl_item.get("TITLE", ["Unknown Title"])[0]
-            artist = pl_item.get("ARTIST", ["Unknown Artist"])[0]
-            length = int(pl_item.info.length) if hasattr(pl_item.info, 'length') else 0
-
-            index = f"#EXTINF:{length}, {artist} - {title}\n{audio_rel_path}"
-            track_list.append(index)
-        except Exception as e:
-            logger.error(f"Error processing {audio_full_path}: {e}")
-            continue
+        index = f"#EXTINF:{length}, {disp_artist} - {disp_title}\n{audio_rel_path}"
+        track_list.append(index)
 
     if len(track_list) > 1:
         with open(pl_full_path, "w", encoding="utf-8") as pl:

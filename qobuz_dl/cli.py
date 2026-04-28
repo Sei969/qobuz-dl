@@ -155,7 +155,7 @@ def _handle_commands(qobuz, arguments):
             sync_playlist(
                 qobuz,
                 arguments.URL,
-                arguments.FOLDER,
+                qobuz.directory,  # <-- MODIFICATO: Prima era arguments.FOLDER
                 auto_confirm=arguments.yes,
             )
         elif arguments.command == "lucky":

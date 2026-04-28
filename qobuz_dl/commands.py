@@ -82,10 +82,6 @@ def sync_playlist_args(subparsers):
         help="Qobuz playlist URL (e.g. https://play.qobuz.com/playlist/12345)",
     )
     sync_pl.add_argument(
-        "FOLDER",
-        help="Local folder path to synchronize",
-    )
-    sync_pl.add_argument(
         "--yes", "-y",
         action="store_true",
         help="Skip confirmation prompt before deleting/downloading",

@@ -50,12 +50,24 @@ def _scan_local_tracks(directory):
 def _fetch_remote_tracks(client, playlist_id):
     """
     Fetch all tracks from a Qobuz playlist via the paginated API.
+    Returns a tuple: (playlist_name, all_items)
     """
     all_items = []
+    playlist_name = "Unknown Playlist"
     for chunk in client.get_plist_meta(playlist_id):
+        if "name" in chunk and playlist_name == "Unknown Playlist":
+            playlist_name = chunk.get("name")
         items = chunk.get("tracks", {}).get("items", [])
         all_items.extend(items)
-    return all_items
+    return playlist_name, all_items
+
+
+def _sanitize_dirname(name):
+    """Remove invalid characters for OS directory names."""
+    invalid_chars = '<>:"/\\|?*'
+    for char in invalid_chars:
+        name = name.replace(char, '_')
+    return name.strip()
 
 
 def sync_playlist(qobuz_dl, url, folder, auto_confirm=False):
@@ -80,11 +92,10 @@ def sync_playlist(qobuz_dl, url, folder, auto_confirm=False):
 
     logger.info(f"\n{YELLOW}━━━ PLAYLIST SYNC ━━━{OFF}")
     logger.info(f"{YELLOW}URL : {url}{OFF}")
-    logger.info(f"{YELLOW}DIR : {folder}{OFF}\n")
 
     # --- 2. Fetch remote playlist ---
     logger.info(f"{CYAN}[1/4] Fetching playlist from Qobuz...{OFF}")
-    remote_items = _fetch_remote_tracks(qobuz_dl.client, playlist_id)
+    playlist_name, remote_items = _fetch_remote_tracks(qobuz_dl.client, playlist_id)
     remote_ids = {str(item["id"]): item for item in remote_items}
     logger.info(f"{CYAN}      Found {len(remote_ids)} tracks in the Qobuz playlist.{OFF}")
 
@@ -92,10 +103,23 @@ def sync_playlist(qobuz_dl, url, folder, auto_confirm=False):
         logger.info(f"{YELLOW}The Qobuz playlist is empty. Nothing to sync.{OFF}")
         return
 
+    # --- Smart Folder Logic ---
+    # Append the playlist name to the base directory, exactly like 'dl' does.
+    # Prevents double-nesting if the user already provided the full path.
+    safe_playlist_name = _sanitize_dirname(playlist_name)
+    base_name = os.path.basename(os.path.normpath(folder))
+    
+    if base_name == safe_playlist_name:
+        target_folder = folder
+    else:
+        target_folder = os.path.join(folder, safe_playlist_name)
+
+    logger.info(f"{YELLOW}DIR : {target_folder}{OFF}\n")
+
     # --- 3. Scan local folder ---
-    os.makedirs(folder, exist_ok=True)
+    os.makedirs(target_folder, exist_ok=True)
     logger.info(f"{CYAN}[2/4] Scanning local folder...{OFF}")
-    local_tracks, untagged = _scan_local_tracks(folder)
+    local_tracks, untagged = _scan_local_tracks(target_folder)
     logger.info(f"{CYAN}      Found {len(local_tracks)} tagged tracks locally.{OFF}")
     if untagged:
         logger.info(
@@ -120,7 +144,7 @@ def sync_playlist(qobuz_dl, url, folder, auto_confirm=False):
         
         # Rigeneriamo comunque il file .m3u nel caso in cui l'ordine online sia cambiato
         if not getattr(qobuz_dl, 'no_m3u_for_playlists', False):
-            make_m3u(folder, remote_items)
+            make_m3u(target_folder, remote_items)
             logger.info(f"{CYAN}✓ Playlist .m3u file updated with latest track order.{OFF}")
         return
 
@@ -187,7 +211,7 @@ def sync_playlist(qobuz_dl, url, folder, auto_confirm=False):
             qobuz_dl.download_from_id(
                 tid,
                 album=False,
-                alt_path=folder,
+                alt_path=target_folder,
                 is_playlist=True,
                 playlist_index=playlist_idx,
             )
@@ -201,7 +225,7 @@ def sync_playlist(qobuz_dl, url, folder, auto_confirm=False):
 
     # Regenerate .m3u if configured
     if not getattr(qobuz_dl, 'no_m3u_for_playlists', False):
-        make_m3u(folder, remote_items)
+        make_m3u(target_folder, remote_items)
 
     # --- Final summary ---
     logger.info(f"\n{GREEN}━━━ SYNC COMPLETE ━━━{OFF}")
