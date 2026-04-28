@@ -19,16 +19,17 @@ Search, explore, and download Lossless and Hi-Res music from [Qobuz](https://www
 ### 🚀 Resilient Download Engine
 * **Bulletproof Queue:** Advanced track-level exception handling. If a single track is geo-blocked or missing from the servers (404 error), the engine gracefully skips it and seamlessly continues downloading the rest of your album or playlist without crashing.
 * **Database Recovery & Sync:** Includes a specialized `--sync-db` engine to restore missing entries in your local database by scanning your existing music folders.
-* **Bidirectional Playlist Sync (`sync-playlist`):** A powerful mirroring engine for dynamic playlists. Keep your local folders perfectly synced with online changes (downloading new tracks and cleanly deleting removed ones) without wasting bandwidth on unnecessary re-downloads.
+* **Bidirectional Playlist Sync (`sync-playlist`):** A powerful mirroring engine for dynamic playlists. Keep your local folders perfectly synced with online changes (downloading new tracks and cleanly deleting removed ones). **v2.0.1 introduces Smart Folder Logic:** when using `-d .` or generic paths, it automatically creates a subfolder named after the playlist, preventing accidental file deletions in your root directory.
 * **Smart Reverse Lookup:** Automatically identifies legacy files by reading their **ISRC** or **UPC** tags and querying the Qobuz API to restore the correct IDs into the database.
 * **Segmented Download & Remuxing:** Bypasses Akamai CDN throttling with a high-speed segmented download engine and automatic FFmpeg remuxing.
 * **Multithreaded Downloading:** Concurrent track downloads for blazing-fast album fetching.
 * **Clean Multithreading UI:** Intelligently switches to a clutter-free, static logging system displaying precise file sizes (MB) during concurrent downloads. This prevents terminal visual glitches and "cursor wars" with the Lyrics Engine, while preserving the classic animated progress bars for sequential (`--delay`) downloads.
+* **Terminal Recovery (Raw Mode Fix):** Resolved a critical UI bug where interrupting the interactive search prompt (`fun` mode) with `CTRL+C` would leave the OS terminal in a broken state. The engine now safely triggers a graceful system exit, restoring the terminal's default line discipline.
 * **Smart Quality Fallback:** Automatically downgrades to the next best available quality if the requested tier is restricted by the server, ensuring your download queue never crashes.
 * **Authentication Bypass:** Log in securely using your browser's **Auth Token** if standard password authentication is blocked. Graciously handles Free/Studio accounts.
 * **Limitless Playlists:** Overcomes Qobuz API restrictions by dynamically paginating chunk requests, allowing you to seamlessly queue and download massive playlists without the standard 50-track bottleneck.
 * **Smart Resume (No Overwrites):** Intelligently detects existing files on your local drive and automatically skips them. If a massive discography download gets interrupted, it resumes instantly without wasting time or bandwidth re-downloading existing tracks.
-* **Flawless `.m3u` Generation:** Automatically generates playlist files with correct relative folder paths. It uses smart API-driven ordering for dynamic playlists and a secure "Natural Sort" fallback for standard albums, guaranteeing the perfect playback sequence out-of-the-box in any media player.
+* **Flawless `.m3u` Generation:** Automatically generates playlist files with correct relative folder paths. **v2.0.1 features a robust 4-pass matching algorithm** (ID -> ISRC -> Title -> Filename) that guarantees the `.m3u` file perfectly mirrors the API order, even when tracks have no numerical prefixes in their filenames.
 
 ### 📁 Advanced Formatting & Storage
 
@@ -166,9 +167,9 @@ python -m qobuz_dl radar
 ```
 
 **Bidirectional Playlist Sync:**
-*(Tip: Add `-y` to bypass confirmation prompts, and `--no-db` to force the engine to rely strictly on the physical files present in the folder).*
+*(Tip: Add `-y` to bypass confirmation prompts. The `-d` flag acts securely, automatically creating a playlist subfolder).*
 ```bash
-python -m qobuz_dl sp "URL" "C:\Path\To\Local\Playlist\Folder"
+python -m qobuz_dl sp "URL" -d "C:\Path\To\Local\Playlist\Folder"
 ```
                             
 **Basic Album/Playlist Download:**
@@ -213,7 +214,7 @@ The Ultimate Edition includes powerful local library managers to keep track of y
 * **Dynamic Playlist Sync (`sync-playlist` / `sp`):**
   Playlists are living entities. Instead of re-downloading a playlist every time the author adds a new song, point this command to your existing folder. It will scan the local tags, interrogate the Qobuz API, and calculate the exact delta: downloading only the missing tracks, cleanly deleting removed ones (alongside their `.lrc` companions), and regenerating the `.m3u` order.
   ```bash
-  python -m qobuz_dl sp "PLAYLIST_URL" "/path/to/your/local/folder"
+  python -m qobuz_dl sp "PLAYLIST_URL" -d "/path/to/your/local/folder"
   ```
 
 * **Retroactive Lyrics Tagger (`lyrics`):**
