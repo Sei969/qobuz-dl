@@ -20,6 +20,7 @@ Search, explore, and download Lossless and Hi-Res music from [Qobuz](https://www
 * **Bulletproof Queue:** Advanced track-level exception handling. If a single track is geo-blocked or missing from the servers (404 error), the engine gracefully skips it and seamlessly continues downloading the rest of your album or playlist without crashing.
 * **Database Recovery & Sync:** Includes a specialized `--sync-db` engine to restore missing entries in your local database by scanning your existing music folders.
 * **Bidirectional Playlist Sync (`sync-playlist`):** A powerful mirroring engine for dynamic playlists. Keep your local folders perfectly synced with online changes (downloading new tracks and cleanly deleting removed ones). **v2.0.1 introduces Smart Folder Logic:** when using `-d .` or generic paths, it automatically creates a subfolder named after the playlist, preventing accidental file deletions in your root directory.
+* **Professional Missing Tracks Table:** If the sync engine detects tracks in your online playlist that are missing from your local drive, it now generates a clean, color-coded ASCII table with Title, Artist, and ID for easy tracking.
 * **Smart Reverse Lookup:** Automatically identifies legacy files by reading their **ISRC** or **UPC** tags and querying the Qobuz API to restore the correct IDs into the database.
 * **Segmented Download & Remuxing:** Bypasses Akamai CDN throttling with a high-speed segmented download engine and automatic FFmpeg remuxing.
 * **Multithreaded Downloading:** Concurrent track downloads for blazing-fast album fetching.
@@ -30,6 +31,7 @@ Search, explore, and download Lossless and Hi-Res music from [Qobuz](https://www
 * **Limitless Playlists:** Overcomes Qobuz API restrictions by dynamically paginating chunk requests, allowing you to seamlessly queue and download massive playlists without the standard 50-track bottleneck.
 * **Smart Resume (No Overwrites):** Intelligently detects existing files on your local drive and automatically skips them. If a massive discography download gets interrupted, it resumes instantly without wasting time or bandwidth re-downloading existing tracks.
 * **Flawless `.m3u` Generation:** Automatically generates playlist files with correct relative folder paths. **v2.0.1 features a robust 4-pass matching algorithm** (ID -> ISRC -> Title -> Filename) that guarantees the `.m3u` file perfectly mirrors the API order, even when tracks have no numerical prefixes in their filenames.
+* **Ultra-Fast O(1) Matching Engine:** The playlist generator now uses high-performance dictionary indexing. It identifies local files instantly, reducing the processing time for massive playlists from seconds to milliseconds. (Thanks to marrobHD)
 
 ### 📁 Advanced Formatting & Storage
 
