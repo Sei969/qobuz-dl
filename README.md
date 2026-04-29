@@ -143,7 +143,7 @@ Since Qobuz blocked direct password logins for third-party applications, you nee
 4. In the left sidebar, expand **Local Storage** and click on `https://play.qobuz.com`.
 5. In the list of keys, find **`localuser`**.
 6. At the bottom of the panel (or by expanding the JSON value), look for the **`token`** string.
-7. Copy that alphanumeric string and paste it into the `qobuz-dl` terminal wizard!
+7. Open your terminal and force the login wizard by running `qobuz-dl -r` (or `--reset`). When the prompt appears, select the Auth Token method and paste your alphanumeric string!
 
 ## 💻 Usage & Quick Examples
 
