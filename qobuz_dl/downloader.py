@@ -476,7 +476,16 @@ class Download:
         elif multiple and self.settings.multiple_disc_one_dir:
             formatted_path = sanitize_filename(clean_filename(self.settings.multiple_disc_track_format.format(**filename_attr)), replacement_text="_")
         else:
-            formatted_path = sanitize_filename(clean_filename(self.track_format.format(**filename_attr)), replacement_text="_")
+            # FIX MULTI-DISC PATHING: Includiamo la cartella CD nel percorso finale se ci sono più dischi
+            base_formatted = sanitize_filename(clean_filename(self.track_format.format(**filename_attr)), replacement_text="_")
+            total_discs = album_or_track_metadata.get('media_count', 1)
+            if multiple and total_discs > 1:
+                try: d_num = int(multiple) if not isinstance(multiple, bool) else 1
+                except (ValueError, TypeError): d_num = 1
+                disc_folder = f"{self.settings.multiple_disc_prefix} {d_num:02}"
+                formatted_path = os.path.join(disc_folder, base_formatted)
+            else:
+                formatted_path = base_formatted
         # -----------------------------------------------------------
             
         max_len = 180

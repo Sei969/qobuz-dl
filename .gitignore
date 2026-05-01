@@ -7,6 +7,7 @@ __pycache__/
 .venv/
 venv/
 env/
+build_env/
 
 # IDE and OS specific files
 /.idea/
