@@ -165,6 +165,8 @@ def _reset_config(config_file):
     config["qobuz"]["no_copyright_tag"] = "false"
     config["qobuz"]["no_label_tag"] = "false"
     
+    config["qobuz"]["no_credits"] = "false"
+    
     config["qobuz"]["no_upc_tag"] = "false"
     config["qobuz"]["no_isrc_tag"] = "false"
           
