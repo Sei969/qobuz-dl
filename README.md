@@ -22,6 +22,7 @@ Search, explore, and download Lossless and Hi-Res music from [Qobuz](https://www
 * **Bidirectional Playlist Sync (`sync-playlist`):** A powerful mirroring engine for dynamic playlists. Keep your local folders perfectly synced with online changes (downloading new tracks and cleanly deleting removed ones). **v2.0.1 introduces Smart Folder Logic:** when using `-d .` or generic paths, it automatically creates a subfolder named after the playlist, preventing accidental file deletions in your root directory.
 * **Professional Missing Tracks Table:** If the sync engine detects tracks in your online playlist that are missing from your local drive, it now generates a clean, color-coded ASCII table with Title, Artist, and ID for easy tracking.
 * **Smart Reverse Lookup:** Automatically identifies legacy files by reading their **ISRC** or **UPC** tags and querying the Qobuz API to restore the correct IDs into the database.
+* **Smart Pre-Flight Config Validation:** Introduced in v2.0.3, an intelligent validation system scans your `config.ini` format strings before any downloads begin. If it detects an unrecognized variable, the engine gracefully aborts the process and uses `difflib` to smartly suggest the correct variable, preventing silent `KeyError` exceptions.
 * **Segmented Download & Remuxing:** Bypasses Akamai CDN throttling with a high-speed segmented download engine and automatic FFmpeg remuxing.
 * **Multithreaded Downloading:** Concurrent track downloads for blazing-fast album fetching.
 * **Clean Multithreading UI:** Intelligently switches to a clutter-free, static logging system displaying precise file sizes (MB) during concurrent downloads. This prevents terminal visual glitches and "cursor wars" with the Lyrics Engine, while preserving the classic animated progress bars for sequential (`--delay`) downloads.
@@ -245,6 +246,7 @@ You can customize your `config.ini` or use the CLI flags `-ff` (Folder Format) a
 * **[vitiko98](https://github.com/vitiko98/qobuz-dl)**: Creator of the original project.
 * **[xwell](https://github.com/xwell/qobuz-dl)**: For the massive tag refactoring and "Goodies" integration.
 * **[catap](https://github.com/catap)**: For the segmented download patch.
+* **JosiahDanger**: Bug reports and feature suggestions.
 * **Sorrow446 & DashLt**: `qobuz-dl` is inspired by the discontinued Qo-DL-Reborn. This tool uses the core API module `qopy`, originally written by them.
 
 ## ⚠️ Disclaimer
