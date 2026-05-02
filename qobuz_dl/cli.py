@@ -1,4 +1,6 @@
 import sys
+import difflib
+import string
 import configparser
 import logging
 import glob
@@ -27,6 +29,62 @@ else:
 CONFIG_PATH = os.path.join(OS_CONFIG, "qobuz-dl")
 CONFIG_FILE = os.path.join(CONFIG_PATH, "config.ini")
 QOBUZ_DB = os.path.join(CONFIG_PATH, "qobuz_dl.db")
+
+
+def validate_config_formats(formats_to_check):
+    """
+    Scans the configuration format strings for unknown variables to prevent
+    silent KeyErrors during the download process. Includes typo suggestions.
+    """
+    VALID_KEYS = {
+        "artist", "album", "album_id", "album_url", "album_title", 
+        "album_title_base", "album_artist", "album_genre", "album_composer", 
+        "label", "copyright", "upc", "barcode", "release_date", "year", 
+        "media_type", "format", "bit_depth", "sampling_rate", "album_version", 
+        "version_tag", "disc_count", "track_count", "ExplicitFlag", "explicit", 
+        "release_type", "tracktitle", "track_title", "track_title_base", 
+        "track_id", "track_artist", "track_composer", "track_number", 
+        "isrc", "version", "disc_number"
+    }
+
+    has_errors = False
+    
+    # Define color strings locally to ensure they print correctly in terminal
+    C_RED = '\033[91m'
+    C_YEL = '\033[93m'
+    C_GRE = '\033[92m'
+    C_OFF = '\033[0m'
+
+    for config_name, format_string in formats_to_check.items():
+        if not format_string:
+            continue
+            
+        try:
+            parsed_vars = [tup[1] for tup in string.Formatter().parse(str(format_string)) if tup[1] is not None]
+            
+            for var in parsed_vars:
+                base_var = var.split(':')[0].split('!')[0]
+                
+                if base_var not in VALID_KEYS:
+                    print(f"{C_YEL}[!] Config Warning: Unknown variable '{{{base_var}}}' detected in '{config_name}'.{C_OFF}")
+                    
+                    # --- NEW: 'Did you mean' logic using difflib ---
+                    similar_keys = difflib.get_close_matches(base_var, VALID_KEYS, n=1, cutoff=0.6)
+                    if similar_keys:
+                        print(f"    {C_GRE}-> Did you mean '{{{similar_keys[0]}}}'?{C_OFF}")
+                    # -----------------------------------------------
+                    
+                    print(f"    {C_RED}-> This will cause the entire format string to be discarded during download.{C_OFF}")
+                    has_errors = True
+                    
+        except ValueError as e:
+            print(f"{C_RED}[!] Config Error: Syntax error in '{config_name}' -> {e}{C_OFF}")
+            has_errors = True
+
+    if has_errors:
+        print(f"\n{C_YEL}[*] Tip: Please check your config.ini file or your command line arguments and fix any typos before downloading.{C_OFF}\n")
+        # Abort the process immediately
+        sys.exit(1)
 
 
 def _reset_config(config_file):
@@ -155,7 +213,7 @@ def _handle_commands(qobuz, arguments):
             sync_playlist(
                 qobuz,
                 arguments.URL,
-                qobuz.directory,  # <-- MODIFICATO: Prima era arguments.FOLDER
+                qobuz.directory,  # <-- MODIFIED: Previously it was arguments.FOLDER
                 auto_confirm=arguments.yes,
             )
         elif arguments.command == "lucky":
@@ -199,8 +257,6 @@ def main():
 
     config = configparser.ConfigParser(interpolation=None)
     config.read(CONFIG_FILE)
-
-    # ... il resto del file continua normalmente ...
 
     try:
         section = "qobuz" if config.has_section("qobuz") else "DEFAULT"
@@ -256,7 +312,7 @@ def main():
     except (configparser.Error, KeyError) as error:
         arguments = qobuz_dl_args().parse_args()
         if not arguments.reset:
-            # FIX: Definiamo i codici ANSI localmente per bypassare l'UnboundLocalError
+            # FIX: Define ANSI codes locally to bypass UnboundLocalError
             RED_C = '\033[91m'
             YELLOW_C = '\033[93m'
             OFF_C = '\033[0m'
@@ -286,10 +342,10 @@ def main():
         from qobuz_dl.sync import sync_database
         from qobuz_dl.qopy import Client
                 
-        # Inizializza un client API leggero per il Reverse Lookup (ignora il downloader pesante)
+        # Initialize a lightweight API client for Reverse Lookup (bypassing the heavy downloader)
         sync_client = Client(email, password, app_id, secrets, user_auth_token=token, force_english=force_english)
         
-        # Gestione del percorso
+        # Path management
         sync_dir = default_folder if arguments.sync_db == "DEFAULT" else arguments.sync_db
         
         if os.name == "nt":
@@ -331,6 +387,18 @@ def main():
     # --------------------------------
 
     settings = QobuzDLSettings.from_arguments_configparser(arguments, config)
+    
+    # Execute the Pre-flight Config Check
+    # --- PRE-FLIGHT CONFIG CHECK ---
+    formats_to_validate = {
+        "folder_format": arguments.folder_format or folder_format,
+        "track_format": arguments.track_format or track_format,
+        "fallback_folder_format": config.get(section, "fallback_folder_format", fallback="{artist} - {album}"),
+        "multiple_disc_track_format": config.get(section, "multiple_disc_track_format", fallback="{disc_number}.{track_number} - {track_title}")
+    }
+    validate_config_formats(formats_to_validate)
+    # -------------------------------
+
     qobuz = QobuzDL(
         directory_to_use,
         arguments.quality,
