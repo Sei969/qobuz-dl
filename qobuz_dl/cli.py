@@ -294,6 +294,8 @@ def main():
         no_cover = config.getboolean(section, "no_cover", fallback=False)
         no_database = config.getboolean(section, "no_database", fallback=False)
         
+        no_credits_config = config.getboolean(section, "no_credits", fallback=False)
+        
         app_id = config.get(section, "app_id")
         secrets = [s for s in config.get(section, "secrets").split(",") if s]
         
@@ -309,7 +311,7 @@ def main():
             fetch_lyrics = False
             
         force_english = not getattr(arguments, 'native_lang', False)
-        no_credits_flag = getattr(arguments, 'no_credits', False) 
+        no_credits_flag = getattr(arguments, 'no_credits', False) or no_credits_config 
         
     except (configparser.Error, KeyError) as error:
         arguments = qobuz_dl_args().parse_args()

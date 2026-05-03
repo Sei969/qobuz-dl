@@ -158,7 +158,7 @@ usage: python -m qobuz_dl dl [-h] [-d PATH] [-q int] [--albums-only] [--no-m3u] 
                              [--embedded-art-size {50,100,150,300,600,max,org}] 
                              [--saved-art-size {50,100,150,300,600,max,org}] 
                              [--multiple-disc-prefix PREFIX] [--multiple-disc-one-dir] 
-                             [--no-lyrics] [--native-lang] [--no-credits] [--delay SECONDS]
+                             [--no-lyrics] [--native-lang] [--no-credits] [--with-credits] [--delay SECONDS]
                              [--no-album-artist-tag] [--no-track-composer-tag] ... 
                              SOURCE [SOURCE ...]
 ```
@@ -190,6 +190,12 @@ python -m qobuz_dl dl list.txt
 Disables multithreading to simulate human behavior during massive download sessions.
 ```bash
 python -m qobuz_dl dl <URL> --delay 1
+```
+
+**Force Booklets & Credits (Config Override):**
+If you have set `no_credits = true` in your `config.ini` to keep your folders clean, you can temporarily override this behavior to force the generation of the Digital Booklet and Tracklist.txt for a specific masterpiece.
+```bash
+python -m qobuz_dl dl <URL> --with-credits
 ```
 
 **Advanced Discography Routing:**

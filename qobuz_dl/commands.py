@@ -201,6 +201,13 @@ def add_common_arg(custom_parser, default_folder, default_quality):
         help="disable the generation of the Digital Booklet.txt (Credits & Review) file",
     )
 
+    # Add override flag to force credits generation if no_credits is set to true in config.ini
+    custom_parser.add_argument(
+        "--with-credits",
+        action="store_true",
+        help="force the generation of the Digital Booklet.txt (overrides config.ini)",
+    )
+
     # Adding tag-related parameters
     tag_group = custom_parser.add_argument_group('tag options')
     tag_group.add_argument(
