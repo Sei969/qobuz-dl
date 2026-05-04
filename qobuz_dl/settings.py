@@ -18,7 +18,8 @@ class QobuzDLSettings:
         self.fallback_folder_format = kwargs.get('fallback_folder_format', DEFAULT_FOLDER)
         self.track_format = kwargs.get('track_format')
         self.smart_discography = kwargs.get('smart_discography', False)
-
+        self.legacy_charmap = kwargs.get('legacy_charmap', False)
+        
         # tag options
         self.no_album_artist_tag = kwargs.get('no_album_artist_tag', False)
         self.no_album_title_tag = kwargs.get('no_album_title_tag', False)

@@ -325,11 +325,36 @@ def get_album_artist(qobuz_album: dict) -> list:
         return [single_artist] if single_artist else []
 
 
-def clean_filename(filename: str) -> str:
+def apply_legacy_charmap(filename: str) -> str:
+    """
+    Apply legacy character replacement rules for Windows path compatibility.
+    Specifically requested for users who prefer standard ASCII over Unicode fullwidth characters.
+    """
+    # Specific rules requested by the community (JosiahDanger)
+    filename = filename.replace(':', '-')
+    filename = filename.replace('?', '')
+    
+    # Standard legacy replacements for other invalid Windows characters
+    filename = filename.replace('/', '-')
+    filename = filename.replace('\\', '-')
+    filename = filename.replace('*', '-')
+    filename = filename.replace('"', "'")
+    filename = filename.replace('<', '[')
+    filename = filename.replace('>', ']')
+    filename = filename.replace('|', '-')
+    
+    # Clean up potential double dashes created by multiple replacements (e.g., "A / B" -> "A - B")
+    filename = re.sub(r'\s*-\s*-+', ' -', filename)
+    
+    return filename
+
+
+def clean_filename(filename: str, legacy_charmap: bool = False) -> str:
     """
     Clean up redundant special characters, spaces, separators in filenames
     and normalize Unicode characters to NFC form
     :param filename:
+    :param legacy_charmap: If True, uses basic ASCII replacements instead of Unicode fullwidth characters
     :return:
     """
     # First normalize the Unicode string to NFC form
@@ -367,7 +392,15 @@ def clean_filename(filename: str) -> str:
 
     # Merge multiple spaces
     filename = re.sub(r'\s+', ' ', filename)
-    return invalid_chars_to_fullwidth(filename.strip().strip(".").strip())
+    
+    # Strip trailing dots and spaces
+    filename = filename.strip().strip(".").strip()
+    
+    # --- NEW LOGIC FOR LEGACY CHARMAP ---
+    if legacy_charmap:
+        return apply_legacy_charmap(filename)
+    else:
+        return invalid_chars_to_fullwidth(filename)
 
 
 def invalid_chars_to_fullwidth(filename):

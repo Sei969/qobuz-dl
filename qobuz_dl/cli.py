@@ -293,6 +293,7 @@ def main():
         embed_art = config.getboolean(section, "embed_art", fallback=True)
         no_cover = config.getboolean(section, "no_cover", fallback=False)
         no_database = config.getboolean(section, "no_database", fallback=False)
+        legacy_charmap = config.getboolean(section, "legacy_charmap", fallback=False)
         
         no_credits_config = config.getboolean(section, "no_credits", fallback=False)
         
@@ -391,6 +392,7 @@ def main():
     # --------------------------------
 
     settings = QobuzDLSettings.from_arguments_configparser(arguments, config)
+    settings.legacy_charmap = legacy_charmap
     
     # Execute the Pre-flight Config Check
     # --- PRE-FLIGHT CONFIG CHECK ---

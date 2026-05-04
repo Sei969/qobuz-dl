@@ -54,14 +54,15 @@ def format_release_type(release_type: str) -> str:
     return release_type.title()
 # --------------------------------------------------------
 
-def process_folder_format_with_subdirs(folder_format, attr_dict, path=None):
+def process_folder_format_with_subdirs(folder_format, attr_dict, path=None, legacy_charmap=False):
     path_parts = folder_format.split('/')
     cleaned_parts = []
     for part in path_parts:
         if part:
             try:
                 formatted_part = part.format(**attr_dict)
-                cleaned_part = sanitize_filepath(clean_filename(formatted_part), replacement_text="_")
+                # AGGIUNTO legacy_charmap QUI:
+                cleaned_part = sanitize_filepath(clean_filename(formatted_part, legacy_charmap=legacy_charmap), replacement_text="_")
                 
                 # --- FIX: SMART TRUNCATION FOR ALBUM FOLDER ---
                 if cleaned_part and len(cleaned_part) > 120:
@@ -73,7 +74,8 @@ def process_folder_format_with_subdirs(folder_format, attr_dict, path=None):
                     cleaned_parts.append(cleaned_part)
             except KeyError as e:
                 logger.warning(f"{YELLOW}Format error ({e}), using original text.{OFF}")
-                cleaned_part = sanitize_filepath(clean_filename(part), replacement_text="_")
+                # AGGIUNTO legacy_charmap ANCHE QUI:
+                cleaned_part = sanitize_filepath(clean_filename(part, legacy_charmap=legacy_charmap), replacement_text="_")
                 
                 if cleaned_part and len(cleaned_part) > 120:
                     start_f = cleaned_part[:60].rstrip(' ."-_\'')
@@ -203,7 +205,8 @@ class Download:
         self._determine_formats(album_meta=album_meta, album_attr=album_attr, tracks_meta=album_meta["tracks"]["items"],
                                 track_attr=None, is_track=False, file_format=file_format, settings=self.settings)
         
-        target_dirn = process_folder_format_with_subdirs(self.folder_format, album_attr, self.path)
+        legacy_flag = getattr(self.settings, 'legacy_charmap', False) if hasattr(self, 'settings') else False
+        target_dirn = process_folder_format_with_subdirs(self.folder_format, album_attr, self.path, legacy_charmap=legacy_flag)
         base_path, folder_name = os.path.split(target_dirn)
         
         incomplete_dirn = os.path.join(base_path, f"[INCOMPLETE] {folder_name}")
@@ -400,7 +403,8 @@ class Download:
             self._determine_formats(album_meta=track_meta.get("album", {}), album_attr=None, tracks_meta=[track_meta],
                                     track_attr=track_attr, is_track=True, file_format=file_format, settings=self.settings)
             
-            dirn = process_folder_format_with_subdirs(self.folder_format, track_attr, self.path)
+            legacy_flag = getattr(self.settings, 'legacy_charmap', False) if hasattr(self, 'settings') else False
+            dirn = process_folder_format_with_subdirs(self.folder_format, track_attr, self.path, legacy_charmap=legacy_flag)
             os.makedirs(dirn, exist_ok=True)
 
             if getattr(self, 'is_playlist', False):
@@ -469,15 +473,17 @@ class Download:
         )
 
         # --- FIX MARROBHD & SYNC-PLAYLIST: CLEAN PLAYLIST NAMING ---
+        legacy_flag = getattr(self.settings, 'legacy_charmap', False) if hasattr(self, 'settings') else False
+        
         if getattr(self, 'is_playlist', False):
             # Forza un nome file pulito senza numero traccia per le playlist
             clean_playlist_format = "{artist} - {track_title}"
-            formatted_path = sanitize_filename(clean_filename(clean_playlist_format.format(**filename_attr)), replacement_text="_")
+            formatted_path = sanitize_filename(clean_filename(clean_playlist_format.format(**filename_attr), legacy_charmap=legacy_flag), replacement_text="_")
         elif multiple and self.settings.multiple_disc_one_dir:
-            formatted_path = sanitize_filename(clean_filename(self.settings.multiple_disc_track_format.format(**filename_attr)), replacement_text="_")
+            formatted_path = sanitize_filename(clean_filename(self.settings.multiple_disc_track_format.format(**filename_attr), legacy_charmap=legacy_flag), replacement_text="_")
         else:
             # FIX MULTI-DISC PATHING: Includiamo la cartella CD nel percorso finale se ci sono più dischi
-            base_formatted = sanitize_filename(clean_filename(self.track_format.format(**filename_attr)), replacement_text="_")
+            base_formatted = sanitize_filename(clean_filename(self.track_format.format(**filename_attr), legacy_charmap=legacy_flag), replacement_text="_")
             total_discs = album_or_track_metadata.get('media_count', 1)
             if multiple and total_discs > 1:
                 try: d_num = int(multiple) if not isinstance(multiple, bool) else 1
@@ -760,6 +766,9 @@ class Download:
         media_count = album_meta.get("media_count", 1)
         is_multiple = True if media_count > 1 else False
         extension = ".flac" if file_format.lower() == "flac" else ".mp3"
+        
+        # --- NEW: Retrieve legacy charmap flag ---
+        legacy_flag = getattr(settings, 'legacy_charmap', False) if settings else False
 
         for folder_fmt, track_fmt, multi_disc_fmt in format_combinations:
             folder_fmt, track_fmt = _clean_format_str(folder_fmt, track_fmt, file_format)
@@ -767,9 +776,9 @@ class Download:
             
             try:
                 if is_track:
-                    root_dir = process_folder_format_with_subdirs(folder_fmt, track_attr)
+                    root_dir = process_folder_format_with_subdirs(folder_fmt, track_attr, legacy_charmap=legacy_flag)
                 else:
-                    root_dir = process_folder_format_with_subdirs(folder_fmt, album_attr)
+                    root_dir = process_folder_format_with_subdirs(folder_fmt, album_attr, legacy_charmap=legacy_flag)
 
                 for track_metadata in tracks_meta:
                     track_artist = _safe_get(track_metadata, "performer", "name")
@@ -777,20 +786,20 @@ class Download:
 
                     curr_root_dir = root_dir
                     if is_multiple and self.settings.multiple_disc_one_dir:
-                        track_path = sanitize_filename(clean_filename(multi_disc_fmt.format(**filename_attr)), replacement_text="_")
+                        track_path = sanitize_filename(clean_filename(multi_disc_fmt.format(**filename_attr), legacy_charmap=legacy_flag), replacement_text="_")
                     else:
                         if is_multiple and not self.settings.multiple_disc_one_dir:
                             disc_dir = f"{self.settings.multiple_disc_prefix} {track_metadata['media_number']:02}"
                             curr_root_dir = os.path.join(root_dir, disc_dir)
                         
-                        track_path = sanitize_filename(clean_filename(track_fmt.format(**filename_attr)), replacement_text="_")
+                        track_path = sanitize_filename(clean_filename(track_fmt.format(**filename_attr), legacy_charmap=legacy_flag), replacement_text="_")
 
-                    final_path = os.path.join(curr_root_dir, track_path + extension)
-                    
-                    if len(final_path) > OK_MAX_CHARACTER_LENGTH:
-                        valid_combination = False
-                        break
+                    # --- FIX: REMOVED OBSOLETE LENGTH CHECK ---
+                    # We no longer invalidate the user's custom format if the path is too long.
+                    # String truncation is now safely handled downstream in _download_and_tag.
+
             except (KeyError, ValueError):
+                # Fallback to the next format ONLY if there is a missing tag/variable in the metadata
                 valid_combination = False
                 continue
 
