@@ -55,6 +55,7 @@ Qobuz-DL Ultimate allows deep customization of your library structure using vari
   * *Folder Example (Special Edition):* `folder_format = {album_artist} - {album_title}{version_tag}` ➔ `The Sunset Violent - Live in Heidelberg`
 * **Multi-Disc Routing:** Store multiple disc releases in one single directory or split them using customizable prefixes (e.g., `CD 01`).
 * **Universal Playlist Generation:** `.m3u` files are strictly UTF-8 encoded, ensuring 100% crash-free generation even with complex Unicode or Japanese characters (Fixes #304).
+* **Legacy Character Replacement (`legacy_charmap`):** By default, the Ultimate Edition uses elegant fullwidth Unicode characters (e.g., `／`) to safely bypass OS filename restrictions without losing the original title's aesthetics. However, purists can activate the `legacy_charmap = true` option in their `config.ini` to enforce standard ASCII replacements (e.g., replacing `/` with `-` or stripping `?`), restoring the classic, old-school naming convention of the original qobuz-dl.
 
 ### ❤️ Native Favorites Sync & Interactive Menu
 Seamlessly bridge your mobile listening habits with your local offline library. Instead of manually copying URLs, launch the Interactive Mode (`fun`) to securely access your personal Qobuz account and browse your **Favorite Albums, Tracks, Artists, and Playlists** directly from the terminal.
@@ -133,6 +134,9 @@ If you want to set a custom download folder, you can edit your `config.ini` file
 ```ini
 [qobuz]
 directory = ~/Music/Qobuz_Lossless
+
+# Set to 'true' to restore classic ASCII character replacements (e.g. replacing '/' with '-')
+legacy_charmap = false
 ```
 *(Note: If you are upgrading from an older version, the legacy `default_folder` key is still fully supported for backward compatibility.)*
 
