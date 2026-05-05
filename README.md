@@ -189,8 +189,8 @@ python -m qobuz_dl dl [https://play.qobuz.com/album/qxjbxh1dc3xyb](https://play.
 ```
 
 **Mass/Batch Downloading (Smart Resume):**
-Do you have a massive list of releases to download? Create a standard text file (e.g., `list.txt`), paste all your Qobuz URLs inside (one per line), and pass it to the engine. It will automatically read the file and download your entire queue!
-*Ultimate Edition Feature:* The text file acts as a living database. As soon as a release is successfully downloaded, the engine appends a `[DONE]` tag next to its URL in the file. If you interrupt the process (`CTRL+C`), simply re-run the exact same command and the engine will instantly skip the completed links and seamlessly resume where it left off.
+Do you have a massive list of releases to download? Create a standard text file (e.g., `list.txt`), paste your Qobuz **and Last.fm** URLs inside (one per line), and pass it to the engine. The smart parser will automatically download your Qobuz links and seamlessly route Last.fm playlists through the Fuzzy Matching engine to process your entire queue in one go!
+*Ultimate Edition Feature:* The text file acts as a living database. As soon as a release or a full playlist is successfully downloaded, the engine appends a `[DONE]` tag next to its URL in the file. If your connection drops or you interrupt the process (`CTRL+C`), simply re-run the exact same command and the engine will instantly skip the completed links and seamlessly resume exactly where it left off.
 ```bash
 python -m qobuz_dl dl list.txt
 ```
