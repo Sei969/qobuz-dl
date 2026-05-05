@@ -38,6 +38,7 @@ class QobuzDLSettings:
         self.no_label_tag = kwargs.get('no_label_tag', False)
         self.no_upc_tag = kwargs.get('no_upc_tag', False)
         self.no_isrc_tag = kwargs.get('no_isrc_tag', False)
+        self.lrc_files = kwargs.get('lrc_files', True)
 
         # cover options
         self.embed_art = kwargs.get('embed_art', False)
@@ -125,6 +126,8 @@ class QobuzDLSettings:
 
             # user_auth_token
             'user_auth_token': config.get("DEFAULT", "user_auth_token", fallback=""),
+        
+            'lrc_files': getattr(arguments, 'lrc_files', config.getboolean("DEFAULT", "lrc_files", fallback=True)),
         }
         
         return QobuzDLSettings(**kwargs)

@@ -97,6 +97,13 @@ def add_common_arg(custom_parser, default_folder, default_quality):
         help=f'directory for downloads (default: "{default_folder}")',
     )
     custom_parser.add_argument(
+        "--no-lrc-files",
+        dest="lrc_files",
+        action="store_false",
+        default=argparse.SUPPRESS,
+        help="do not save synchronized lyrics to external .lrc files",
+    )
+    custom_parser.add_argument(
         "-q",
         "--quality",
         metavar="int",

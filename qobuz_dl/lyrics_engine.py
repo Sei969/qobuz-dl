@@ -18,7 +18,7 @@ class LyricsEngine:
             # Initialize Genius in silent mode (verbose=False)
             self.genius = lyricsgenius.Genius(self.genius_token, verbose=False, remove_section_headers=True)
 
-    def fetch_and_inject(self, file_path, artist, track, album):
+    def fetch_and_inject(self, file_path, artist, track, album, save_lrc=True):
         """Waterfall engine: first try LRCLIB (for LRC format), then Genius."""
         try:
             print(f"    🔍 Searching lyrics for: {track}...")
@@ -26,7 +26,7 @@ class LyricsEngine:
             # ATTEMPT 1: LRCLIB (Free search, priority to synchronized lyrics)
             lrclib_url = "https://lrclib.net/api/get"
             
-            # Aggiungiamo un User-Agent ufficiale per evitare blocchi o rallentamenti da parte dell'API
+            # Add an official User-Agent to avoid blocks or throttling from the API
             headers = {"User-Agent": "qobuz-dl-ultimate/1.0 (https://github.com/Sei969/qobuz-dl)"}
             
             # Try A: Exact match (Artist + Track + Album)
@@ -44,13 +44,17 @@ class LyricsEngine:
                 plain_lyrics = data.get("plainLyrics")
                 
                 if synced_lyrics:
-                    self._save_lrc_file(file_path, synced_lyrics)
-                    # INIEZIONE CORRETTA: Passiamo il testo con i timestamp temporali!
+                    # CORRECT INJECTION: We pass the text with timestamps!
                     self._inject_metadata(file_path, synced_lyrics)
-                    print(f"    ✅ Synchronized lyrics saved and injected!")
+                    
+                    if save_lrc:
+                        self._save_lrc_file(file_path, synced_lyrics)
+                        print(f"    ✅ Synchronized lyrics injected and saved as .lrc!")
+                    else:
+                        print(f"    ✅ Synchronized lyrics injected into metadata!")
                     return
                 elif plain_lyrics:
-                    # Se non esiste la versione sincronizzata, ripieghiamo su quella statica
+                    # If no synchronized version exists, fallback to the static one
                     self._inject_metadata(file_path, plain_lyrics)
                     print(f"    ✅ Standard lyrics injected into metadata!")
                     return

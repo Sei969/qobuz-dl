@@ -605,7 +605,11 @@ class Download:
             
             with print_lock:
                 self.lyrics_engine.fetch_and_inject(
-                    file_path=final_file, artist=search_artist, track=track_title, album=search_album
+                    file_path=final_file, 
+                    artist=search_artist, 
+                    track=track_title, 
+                    album=search_album,
+                    save_lrc=self.settings.lrc_files
                 )
 
         delay_time = getattr(self.settings, 'delay', 0)
@@ -732,12 +736,18 @@ class Download:
             "release_type": format_release_type(meta.get("release_type")),
         }
 
-    def _get_format(self, item_dict):
-        if "tracks" not in item_dict or not item_dict["tracks"].get("items"):
-            from qobuz_dl.exceptions import NonStreamable
-            raise NonStreamable("This release has no tracks available (possibly region-locked or removed)")
+    def _get_format(self, item_dict, is_track_id=False, track_url_dict=None):
+        # Aggiungi questa protezione anti-crash SOLO per le release complete (Album/EP)
+        if not is_track_id:
+            if "tracks" not in item_dict or not item_dict["tracks"].get("items"):
+                from qobuz_dl.exceptions import NonStreamable
+                raise NonStreamable("This release has no tracks available (possibly region-locked or removed)")
 
-        track_dict = item_dict["tracks"]["items"][0]
+        # FIX: Applica la logica corretta a seconda se è una traccia singola o un album
+        track_dict = item_dict if is_track_id else item_dict["tracks"]["items"][0]
+        
+        # INIZIALIZZAZIONE MANCANTE: Di default la qualità è rispettata!
+        quality_met = True
         
         try:
             new_track_dict = (
