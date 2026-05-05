@@ -732,14 +732,13 @@ class Download:
             "release_type": format_release_type(meta.get("release_type")),
         }
 
-    def _get_format(self, item_dict, is_track_id=False, track_url_dict=None):
-        quality_met = True
-        if int(self.quality) == 5:
-            return ("MP3", quality_met, None, None)
-        track_dict = item_dict
-        if not is_track_id:
-            track_dict = item_dict["tracks"]["items"][0]
+    def _get_format(self, item_dict):
+        if "tracks" not in item_dict or not item_dict["tracks"].get("items"):
+            from qobuz_dl.exceptions import NonStreamable
+            raise NonStreamable("This release has no tracks available (possibly region-locked or removed)")
 
+        track_dict = item_dict["tracks"]["items"][0]
+        
         try:
             new_track_dict = (
                 self.client.get_track_url(track_dict["id"], fmt_id=self.quality)

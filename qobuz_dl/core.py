@@ -222,37 +222,72 @@ class QobuzDL:
         else:
             self.download_from_id(item_id, type_dict["album"])
 
-    def download_list_of_urls(self, urls):
+    # --- SMART RESUME / BATCH DOWNLOADER LOGIC ---
+    def mark_url_done_in_file(self, txt_file, url_to_mark):
+        """Appends a [DONE] tag next to a processed URL in the text file."""
+        if not txt_file or not os.path.isfile(txt_file):
+            return
+        try:
+            with open(txt_file, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+            
+            with open(txt_file, "w", encoding="utf-8") as f:
+                for line in lines:
+                    if line.strip() == url_to_mark:
+                        f.write(f"{line.rstrip()} [DONE]\n")
+                    else:
+                        f.write(line)
+        except Exception as e:
+            logger.error(f"{RED}Failed to update text file status: {e}{OFF}")
+
+    def download_list_of_urls(self, urls, txt_file=None):
         if not urls or not isinstance(urls, list):
             logger.info(f"{OFF}Nothing to download")
             return
         for url in urls:
             # --- FIX QOBUZ NEW DOMAIN LINKS ---
+            original_url = url
             url = url.replace("open.qobuz.com", "play.qobuz.com")
             
             if "last.fm" in url:
                 self.download_lastfm_pl(url)
+                self.mark_url_done_in_file(txt_file, original_url)
             elif os.path.isfile(url):
                 self.download_from_txt_file(url)
             else:
                 self.handle_url(url)
+                self.mark_url_done_in_file(txt_file, original_url)
 
     def download_from_txt_file(self, txt_file):
-        with open(txt_file, "r") as txt:
-            try:
-                urls = [
-                    line.replace("\n", "")
-                    for line in txt.readlines()
-                    if not line.strip().startswith("#")
-                ]
-            except Exception as e:
-                logger.error(f"{RED}Invalid text file: {e}")
-                return
-            logger.info(
-                f"{YELLOW}qobuz-dl will download {len(urls)}"
-                f" urls from file: {txt_file}"
-            )
-            self.download_list_of_urls(urls)
+        try:
+            valid_urls = []
+            with open(txt_file, "r", encoding="utf-8") as txt:
+                for line in txt.readlines():
+                    line = line.strip()
+                    if not line or line.startswith("#") or "[DONE]" in line:
+                        continue
+                    
+                    # Validate if it's a Qobuz URL
+                    try:
+                        get_url_info(line)
+                        valid_urls.append(line)
+                    except (KeyError, IndexError, AttributeError):
+                        logger.debug(f"Skipping invalid URL line: {line}")
+                        
+        except Exception as e:
+            logger.error(f"{RED}Invalid text file: {e}")
+            return
+            
+        if not valid_urls:
+            logger.info(f"{OFF}No new valid URLs found in file: {txt_file}")
+            return
+            
+        logger.info(
+            f"{YELLOW}qobuz-dl will download {len(valid_urls)}"
+            f" urls from file: {txt_file}"
+        )
+        self.download_list_of_urls(valid_urls, txt_file=txt_file)
+    # ---------------------------------------------
 
     def lucky_mode(self, query, download=True):
         if len(query) < 3:
