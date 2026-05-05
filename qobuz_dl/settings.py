@@ -72,62 +72,65 @@ class QobuzDLSettings:
         Returns:
             QobuzDLSettings: Configuration object
         """
+        # Determine the correct section to read from config.ini
+        section = "qobuz" if config.has_section("qobuz") else "DEFAULT"
+        
         # basic options
         kwargs = {
-            'email': config.get("DEFAULT", "email", fallback=""),
-            'password': config.get("DEFAULT", "password", fallback=""),
-            'default_folder': arguments.directory or config.get("DEFAULT", "default_folder", fallback="QobuzDownloads"),
-            'default_quality': arguments.quality or config.get("DEFAULT", "default_quality", fallback="6"),
-            'default_limit': config.get("DEFAULT", "default_limit", fallback="20"),
-            'no_m3u': arguments.no_m3u or config.getboolean("DEFAULT", "no_m3u", fallback=False),
-            'albums_only': arguments.albums_only or config.getboolean("DEFAULT", "albums_only", fallback=False),
-            'no_fallback': arguments.no_fallback or config.getboolean("DEFAULT", "no_fallback", fallback=False),
-            'no_database': arguments.no_db or config.getboolean("DEFAULT", "no_database", fallback=False),
-            'app_id': config.get("DEFAULT", "app_id", fallback=""),
-            'secrets': [s for s in config.get("DEFAULT", "secrets", fallback="").split(",") if s],
-            'folder_format': arguments.folder_format or config.get("DEFAULT", "folder_format", fallback=DEFAULT_FOLDER),
-            'fallback_folder_format': arguments.fallback_folder_format or config.get("DEFAULT", "fallback_folder_format", fallback=DEFAULT_FOLDER),
-            'track_format': arguments.track_format or config.get("DEFAULT", "track_format", fallback=DEFAULT_TRACK),
-            'smart_discography': arguments.smart_discography or config.getboolean("DEFAULT", "smart_discography", fallback=False),
+            'email': config.get(section, "email", fallback=""),
+            'password': config.get(section, "password", fallback=""),
+            'default_folder': arguments.directory or config.get(section, "default_folder", fallback="QobuzDownloads"),
+            'default_quality': arguments.quality or config.get(section, "default_quality", fallback="6"),
+            'default_limit': config.get(section, "default_limit", fallback="20"),
+            'no_m3u': arguments.no_m3u or config.getboolean(section, "no_m3u", fallback=False),
+            'albums_only': arguments.albums_only or config.getboolean(section, "albums_only", fallback=False),
+            'no_fallback': arguments.no_fallback or config.getboolean(section, "no_fallback", fallback=False),
+            'no_database': arguments.no_db or config.getboolean(section, "no_database", fallback=False),
+            'app_id': config.get(section, "app_id", fallback=""),
+            'secrets': [s for s in config.get(section, "secrets", fallback="").split(",") if s],
+            'folder_format': arguments.folder_format or config.get(section, "folder_format", fallback=DEFAULT_FOLDER),
+            'fallback_folder_format': arguments.fallback_folder_format or config.get(section, "fallback_folder_format", fallback=DEFAULT_FOLDER),
+            'track_format': arguments.track_format or config.get(section, "track_format", fallback=DEFAULT_TRACK),
+            'smart_discography': arguments.smart_discography or config.getboolean(section, "smart_discography", fallback=False),
             
             # cover options
-            'embed_art': arguments.embed_art or config.getboolean("DEFAULT", "embed_art", fallback=True),
-            'og_cover': arguments.og_cover or config.getboolean("DEFAULT", "og_cover", fallback=False),
-            'no_cover': arguments.no_cover or config.getboolean("DEFAULT", "no_cover", fallback=False),
-            'embedded_art_size': arguments.embedded_art_size or config.get("DEFAULT", "embedded_art_size", fallback="600"),
-            'saved_art_size': arguments.saved_art_size or config.get("DEFAULT", "saved_art_size", fallback="org"),
+            'embed_art': arguments.embed_art or config.getboolean(section, "embed_art", fallback=True),
+            'og_cover': arguments.og_cover or config.getboolean(section, "og_cover", fallback=False),
+            'no_cover': arguments.no_cover or config.getboolean(section, "no_cover", fallback=False),
+            'embedded_art_size': arguments.embedded_art_size or config.get(section, "embedded_art_size", fallback="600"),
+            'saved_art_size': arguments.saved_art_size or config.get(section, "saved_art_size", fallback="org"),
             
             # multiple disc option
-            'multiple_disc_prefix': arguments.multiple_disc_prefix or config.get("DEFAULT", "multiple_disc_prefix", fallback="CD"),
-            'multiple_disc_one_dir': arguments.multiple_disc_one_dir or config.getboolean("DEFAULT", "multiple_disc_one_dir", fallback=False),
-            'multiple_disc_track_format': arguments.multiple_disc_track_format or config.get("DEFAULT", "multiple_disc_track_format", fallback="{disc_number}.{track_number} - {track_title}"),
+            'multiple_disc_prefix': arguments.multiple_disc_prefix or config.get(section, "multiple_disc_prefix", fallback="CD"),
+            'multiple_disc_one_dir': arguments.multiple_disc_one_dir or config.getboolean(section, "multiple_disc_one_dir", fallback=False),
+            'multiple_disc_track_format': arguments.multiple_disc_track_format or config.get(section, "multiple_disc_track_format", fallback="{disc_number}.{track_number} - {track_title}"),
                                  
             # tag options
-            'no_album_artist_tag': arguments.no_album_artist_tag or config.getboolean("DEFAULT", "no_album_artist_tag", fallback=False),
-            'no_album_title_tag': arguments.no_album_title_tag or config.getboolean("DEFAULT", "no_album_title_tag", fallback=False),
-            'no_track_artist_tag': arguments.no_track_artist_tag or config.getboolean("DEFAULT", "no_track_artist_tag", fallback=False),
-            'no_track_title_tag': arguments.no_track_title_tag or config.getboolean("DEFAULT", "no_track_title_tag", fallback=False),
-            'no_release_date_tag': arguments.no_release_date_tag or config.getboolean("DEFAULT", "no_release_date_tag", fallback=False),
-            'no_media_type_tag': arguments.no_media_type_tag or config.getboolean("DEFAULT", "no_media_type_tag", fallback=False),
-            'no_genre_tag': arguments.no_genre_tag or config.getboolean("DEFAULT", "no_genre_tag", fallback=False),
-            'no_track_number_tag': arguments.no_track_number_tag or config.getboolean("DEFAULT", "no_track_number_tag", fallback=False),
-            'no_track_total_tag': arguments.no_track_total_tag or config.getboolean("DEFAULT", "no_track_total_tag", fallback=False),
-            'no_disc_number_tag': arguments.no_disc_number_tag or config.getboolean("DEFAULT", "no_disc_number_tag", fallback=False),
-            'no_disc_total_tag': arguments.no_disc_total_tag or config.getboolean("DEFAULT", "no_disc_total_tag", fallback=False),
-            'no_composer_tag': arguments.no_composer_tag or config.getboolean("DEFAULT", "no_composer_tag", fallback=False),
-            'no_explicit_tag': arguments.no_explicit_tag or config.getboolean("DEFAULT", "no_explicit_tag", fallback=False),
-            'no_copyright_tag': arguments.no_copyright_tag or config.getboolean("DEFAULT", "no_copyright_tag", fallback=False),
-            'no_label_tag': arguments.no_label_tag or config.getboolean("DEFAULT", "no_label_tag", fallback=False),
-            'no_upc_tag': arguments.no_upc_tag or config.getboolean("DEFAULT", "no_upc_tag", fallback=False),
-            'no_isrc_tag': arguments.no_isrc_tag or config.getboolean("DEFAULT", "no_isrc_tag", fallback=False),
+            'no_album_artist_tag': arguments.no_album_artist_tag or config.getboolean(section, "no_album_artist_tag", fallback=False),
+            'no_album_title_tag': arguments.no_album_title_tag or config.getboolean(section, "no_album_title_tag", fallback=False),
+            'no_track_artist_tag': arguments.no_track_artist_tag or config.getboolean(section, "no_track_artist_tag", fallback=False),
+            'no_track_title_tag': arguments.no_track_title_tag or config.getboolean(section, "no_track_title_tag", fallback=False),
+            'no_release_date_tag': arguments.no_release_date_tag or config.getboolean(section, "no_release_date_tag", fallback=False),
+            'no_media_type_tag': arguments.no_media_type_tag or config.getboolean(section, "no_media_type_tag", fallback=False),
+            'no_genre_tag': arguments.no_genre_tag or config.getboolean(section, "no_genre_tag", fallback=False),
+            'no_track_number_tag': arguments.no_track_number_tag or config.getboolean(section, "no_track_number_tag", fallback=False),
+            'no_track_total_tag': arguments.no_track_total_tag or config.getboolean(section, "no_track_total_tag", fallback=False),
+            'no_disc_number_tag': arguments.no_disc_number_tag or config.getboolean(section, "no_disc_number_tag", fallback=False),
+            'no_disc_total_tag': arguments.no_disc_total_tag or config.getboolean(section, "no_disc_total_tag", fallback=False),
+            'no_composer_tag': arguments.no_composer_tag or config.getboolean(section, "no_composer_tag", fallback=False),
+            'no_explicit_tag': arguments.no_explicit_tag or config.getboolean(section, "no_explicit_tag", fallback=False),
+            'no_copyright_tag': arguments.no_copyright_tag or config.getboolean(section, "no_copyright_tag", fallback=False),
+            'no_label_tag': arguments.no_label_tag or config.getboolean(section, "no_label_tag", fallback=False),
+            'no_upc_tag': arguments.no_upc_tag or config.getboolean(section, "no_upc_tag", fallback=False),
+            'no_isrc_tag': arguments.no_isrc_tag or config.getboolean(section, "no_isrc_tag", fallback=False),
             
             # Add parallel download thread count configuration
-            'max_workers': arguments.max_workers or config.get("DEFAULT", "max_workers", fallback="3"),
+            'max_workers': arguments.max_workers or config.get(section, "max_workers", fallback="3"),
 
             # user_auth_token
-            'user_auth_token': config.get("DEFAULT", "user_auth_token", fallback=""),
+            'user_auth_token': config.get(section, "user_auth_token", fallback=""),
         
-            'lrc_files': getattr(arguments, 'lrc_files', config.getboolean("DEFAULT", "lrc_files", fallback=True)),
+            'lrc_files': getattr(arguments, 'lrc_files', config.getboolean(section, "lrc_files", fallback=True)),
         }
         
         return QobuzDLSettings(**kwargs)

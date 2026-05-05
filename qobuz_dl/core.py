@@ -233,7 +233,8 @@ class QobuzDL:
             
             with open(txt_file, "w", encoding="utf-8") as f:
                 for line in lines:
-                    if line.strip() == url_to_mark:
+                    # Safely compare by stripping whitespaces to avoid mismatch bugs
+                    if line.strip() == url_to_mark.strip():
                         f.write(f"{line.rstrip()} [DONE]\n")
                     else:
                         f.write(line)
@@ -262,20 +263,25 @@ class QobuzDL:
         try:
             valid_urls = []
             with open(txt_file, "r", encoding="utf-8") as txt:
-                for line in txt.readlines():
+                # Optimized memory usage: read line by line instead of readlines()
+                for line in txt:
                     line = line.strip()
+                    # Skip empty lines, comments, or already processed links
                     if not line or line.startswith("#") or "[DONE]" in line:
                         continue
                     
-                    # Validate if it's a Qobuz URL
-                    try:
-                        get_url_info(line)
+                    # Validate if it's a Qobuz or Last.fm URL
+                    if "last.fm" in line:
                         valid_urls.append(line)
-                    except (KeyError, IndexError, AttributeError):
-                        logger.debug(f"Skipping invalid URL line: {line}")
+                    else:
+                        try:
+                            get_url_info(line)
+                            valid_urls.append(line)
+                        except (KeyError, IndexError, AttributeError):
+                            logger.debug(f"Skipping invalid URL line: {line}")
                         
         except Exception as e:
-            logger.error(f"{RED}Invalid text file: {e}")
+            logger.error(f"{RED}Invalid text file: {e}{OFF}")
             return
             
         if not valid_urls:
@@ -284,7 +290,7 @@ class QobuzDL:
             
         logger.info(
             f"{YELLOW}qobuz-dl will download {len(valid_urls)}"
-            f" urls from file: {txt_file}"
+            f" urls from file: {txt_file}{OFF}"
         )
         self.download_list_of_urls(valid_urls, txt_file=txt_file)
     # ---------------------------------------------
