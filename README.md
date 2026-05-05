@@ -31,6 +31,7 @@ Search, explore, and download Lossless and Hi-Res music from [Qobuz](https://www
 * **Authentication Bypass:** Log in securely using your browser's **Auth Token** if standard password authentication is blocked. Graciously handles Free/Studio accounts.
 * **Limitless Playlists:** Overcomes Qobuz API restrictions by dynamically paginating chunk requests, allowing you to seamlessly queue and download massive playlists without the standard 50-track bottleneck.
 * **Smart Resume (No Overwrites):** Intelligently detects existing files on your local drive and automatically skips them. If a massive discography download gets interrupted, it resumes instantly without wasting time or bandwidth re-downloading existing tracks.
+* **Stateful Batch Downloading (Text File Memory):** When downloading massive queues from a `.txt` file, the engine acts as a living database. It automatically validates URLs and appends a `[DONE]` tag next to completed links directly inside your text file. If your connection drops or you abort the process, simply re-run the command: the engine will instantly skip the completed links and seamlessly resume the queue exactly where it left off.
 * **Flawless `.m3u` Generation:** Automatically generates playlist files with correct relative folder paths. **v2.0.1 features a robust 4-pass matching algorithm** (ID -> ISRC -> Title -> Filename) that guarantees the `.m3u` file perfectly mirrors the API order, even when tracks have no numerical prefixes in their filenames.
 * **Ultra-Fast O(1) Matching Engine:** The playlist generator now uses high-performance dictionary indexing. It identifies local files instantly, reducing the processing time for massive playlists from seconds to milliseconds. (Thanks to marrobHD)
 
@@ -184,8 +185,9 @@ python -m qobuz_dl sp "URL" -d "C:\Path\To\Local\Playlist\Folder"
 python -m qobuz_dl dl [https://play.qobuz.com/album/qxjbxh1dc3xyb](https://play.qobuz.com/album/qxjbxh1dc3xyb)
 ```
 
-**Mass/Batch Downloading:**
+**Mass/Batch Downloading (Smart Resume):**
 Do you have a massive list of releases to download? Create a standard text file (e.g., `list.txt`), paste all your Qobuz URLs inside (one per line), and pass it to the engine. It will automatically read the file and download your entire queue!
+*Ultimate Edition Feature:* The text file acts as a living database. As soon as a release is successfully downloaded, the engine appends a `[DONE]` tag next to its URL in the file. If you interrupt the process (`CTRL+C`), simply re-run the exact same command and the engine will instantly skip the completed links and seamlessly resume where it left off.
 ```bash
 python -m qobuz_dl dl list.txt
 ```
