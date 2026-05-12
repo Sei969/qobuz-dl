@@ -1047,14 +1047,16 @@ def tqdm_download(url_or_callable, fname, track_name, is_parallel=False):
                 safe_print(f"{G}  L Completed: {track_name}{O}")
                 return 
 
-        except Exception:
+        except Exception as e:
             if attempt < max_retries - 1:
                 wait = backoff_delays[attempt]
-                safe_print(f"\n{Y}[!] Server block. Retrying in {wait}s ({attempt+1}/{max_retries})...{O}")
+                # Add {e} to the end of the message to print error details (e.g. Status Server: 404)
+                safe_print(f"\n{Y}[!] Server block. Retrying in {wait}s ({attempt+1}/{max_retries}) | Error details: {e}{O}")
                 time.sleep(wait)
             else:
                 if os.path.exists(fname): os.remove(fname)
-                raise Exception("Definitive timeout")
+                # You can also throw the original error here for easier debugging instead of just "Definitive timeout"
+                raise Exception(f"Definitive timeout after {max_retries} attempts. Last error: {e}")
 
     if downloaded_size < total_size and not abort_event.is_set():
         if os.path.exists(fname): os.remove(fname)
@@ -1079,7 +1081,27 @@ def _get_extra(item, dirn, extra="cover.jpg", art_size=None, og_quality=False):
     if art_size in ["50", "100", "150", "300", "600", "max", "org"]:
         item = item.replace("_600.", f"_{art_size}.")
         
-    tqdm_download(item, extra_file, extra, is_parallel=False)
+    # tqdm_download(item, extra_file, extra, is_parallel=False)
+    # [Modified]
+    try:
+        # Original code to download image
+        tqdm_download(item, extra_file, extra, is_parallel=False)
+    except Exception as e:
+        # Bypass and do not throw error to the program anymore
+        pass
+        
+        # Create error log file path in the Album directory (dirn)
+        error_log_path = os.path.join(dirn, "download_errors.txt")
+        
+        # Write error to file (using 'a' mode to append, do not overwrite old errors if there are many)
+        try:
+            with open(error_log_path, "a", encoding="utf-8") as log_file:
+                log_file.write(f"[SKIPPED] Error downloading cover art '{extra}' (URL: {item})\n")
+                log_file.write(f"Error details: {str(e)}\n")
+                log_file.write("-" * 40 + "\n")
+        except Exception:
+            # If creating log file also fails (due to permissions, folder name...), then skip it completely
+            pass
 
 def _clean_format_str(folder: str, track: str, file_format: str) -> Tuple[str, str]:
     final = []
