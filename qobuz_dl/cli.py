@@ -23,12 +23,14 @@ logging.basicConfig(
     format="%(message)s",
 )
 
-if os.name == "nt":
-    OS_CONFIG = os.environ.get("APPDATA")
-else:
-    OS_CONFIG = os.path.join(os.environ["HOME"], ".config")
+CONFIG_DIR = os.environ.get("CONFIG_DIR")
+if not CONFIG_DIR:
+    if os.name == "nt":
+        CONFIG_DIR = os.environ.get("APPDATA")
+    else:
+        CONFIG_DIR = os.path.join(os.environ["HOME"], ".config")
 
-CONFIG_PATH = os.path.join(OS_CONFIG, "qobuz-dl")
+CONFIG_PATH = os.path.join(CONFIG_DIR, "qobuz-dl")
 CONFIG_FILE = os.path.join(CONFIG_PATH, "config.ini")
 QOBUZ_DB = os.path.join(CONFIG_PATH, "qobuz_dl.db")
 
