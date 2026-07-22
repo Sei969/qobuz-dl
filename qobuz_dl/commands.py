@@ -203,6 +203,11 @@ def add_common_arg(custom_parser, default_folder, default_quality):
 
     # --- NEW COMMANDS FOR ULTIMATE FEATURES ---
     custom_parser.add_argument(
+        "--playlist-as-albums",
+        action="store_true",
+        help="Download playlist items using standard album folder structures instead of a flat playlist directory",
+    )
+    custom_parser.add_argument(
         "--no-lyrics",
         action="store_true",
         help="disable automatic lyrics fetching and injection for this session",

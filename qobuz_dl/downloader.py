@@ -130,7 +130,8 @@ class Download:
         download_db=None,
         is_playlist: bool = False,           
         playlist_track_number: int = None, 
-        booklet_only: bool = False,        
+        booklet_only: bool = False,
+        playlist_as_albums: bool = False,
     ):
         self.client = client
         self.item_id = item_id
@@ -155,7 +156,8 @@ class Download:
         self.download_db = download_db
         
         self.is_playlist = is_playlist                       
-        self.playlist_track_number = playlist_track_number   
+        self.playlist_track_number = playlist_track_number
+        self.playlist_as_albums = playlist_as_albums
         
         self._original_folder_format = folder_format or DEFAULT_FOLDER
         self._original_track_format = track_format or DEFAULT_TRACK
@@ -426,7 +428,7 @@ class Download:
             dirn = process_folder_format_with_subdirs(self.folder_format, track_attr, self.path, legacy_charmap=legacy_flag)
             os.makedirs(dirn, exist_ok=True)
 
-            if getattr(self, 'is_playlist', False):
+            if getattr(self, 'is_playlist', False) and not getattr(self, 'playlist_as_albums', False):
                 logger.info(f"{OFF}Skipping standard cover save to keep playlist folder clean")
             elif self.settings.no_cover:
                 logger.info(f"{OFF}Skipping cover")
@@ -498,7 +500,7 @@ class Download:
         # --- FIX MARROBHD & SYNC-PLAYLIST: CLEAN PLAYLIST NAMING ---
         legacy_flag = getattr(self.settings, 'legacy_charmap', False) if hasattr(self, 'settings') else False
         
-        if getattr(self, 'is_playlist', False):
+        if getattr(self, 'is_playlist', False) and not getattr(self, 'playlist_as_albums', False):
             # Forza un nome file pulito senza numero traccia per le playlist
             clean_playlist_format = "{artist} - {track_title}"
             formatted_path = sanitize_filename(clean_filename(clean_playlist_format.format(**filename_attr), legacy_charmap=legacy_flag), replacement_text="_")

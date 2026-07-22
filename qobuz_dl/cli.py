@@ -414,6 +414,7 @@ def main():
         
         no_credits_config = config.getboolean(section, "no_credits", fallback=False)
         blacklist_config = config.get(section, "blacklist", fallback="blacklist.txt")
+        playlist_as_albums_config = config.getboolean(section, "playlist_as_albums", fallback=False)
         
         app_id = config.get(section, "app_id")
         secrets = [s for s in config.get(section, "secrets").split(",") if s]
@@ -547,6 +548,7 @@ def main():
         settings=settings,
         booklet_only=getattr(arguments, 'booklet_only', False),
         blacklist=getattr(arguments, 'blacklist', None) or blacklist_config,
+        playlist_as_albums=getattr(arguments, 'playlist_as_albums', False) or playlist_as_albums_config,
     )
     
     qobuz.initialize_client(email, password, app_id, secrets)

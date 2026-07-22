@@ -53,6 +53,7 @@ Qobuz-DL Ultimate allows deep customization of your library structure using vari
   * **Position-Independent Naming:** Audio files are saved cleanly (e.g., `Artist - Title.flac`) without hardcoded numerical prefixes. This industry-standard approach ensures that if a playlist changes order online, your local files are recognized instantly, preventing massive duplicate re-downloads.
   * **Smart API-Driven `.m3u`:** Playback order is guaranteed by a dynamically generated `.m3u` file that perfectly mirrors the exact sequence dictated by the Qobuz servers, regardless of the physical files' names.
   * **Smart Cover Management:** Eliminates the "Cover Conflict" bug. The engine dynamically manages embedded artwork, ensuring each track gets its correct unique cover without leaving duplicate `cover.jpg` files in the folder.
+  * **Album Mode Override (`--playlist-as-albums`):** *New feature.* If you use playlists to hunt for specific songs, this flag completely bypasses the Flat Folder logic. The engine will "explode" the playlist, routing each track into its respective original album folder using your standard `folder_format`, keeping the original track numbers, and downloading the specific cover art for each album.
 * **Powerful Variables:** `folder_format` and `track_format` now support dozens of new variables (e.g., `{isrc}`, `{barcode}`, `{label}`, `{track_composer}`).
 * **Release Type (`{release_type}`):** Automatically identifies the publication category from Qobuz APIs (e.g., `Album`, `EP`, `Single`), allowing you to dynamically route downloads into subdirectories or use it as a naming prefix without enforcing a fixed structure.
   * *Folder Example (Subdirectory):* `folder_format = {release_type}/{album_artist} - {album_title}` ➔ `Album/Daft Punk - Discovery`
@@ -203,8 +204,8 @@ usage: python -m qobuz_dl dl [-h] [-d PATH] [-q int] [--albums-only] [--no-m3u] 
                              [--embedded-art-size {50,100,150,300,600,max,org}] 
                              [--saved-art-size {50,100,150,300,600,max,org}] 
                              [--multiple-disc-prefix PREFIX] [--multiple-disc-one-dir] 
-                             [--no-lyrics] [--no-lrc-files] [--native-lang] [--no-credits] [--with-credits] [--booklet-only] [--delay SECONDS]
-                             [--no-album-artist-tag] [--no-track-composer-tag] [--no-conductor-tag] [--no-ensemble-tag] [--no-work-tag] [--no-replaygain-tag] [--no-album-url-tag] ... 
+                             [--no-lyrics] [--no-lrc-files] [--native-lang] [--no-credits] [--with-credits] [--booklet-only] [--delay SECONDS] [--playlist-as-albums]
+                             [--no-album-artist-tag] [--no-track-composer-tag] ... 
                              SOURCE [SOURCE ...]
 ```
 
@@ -223,6 +224,12 @@ python -m qobuz_dl sp "URL" -d "C:\Path\To\Local\Playlist\Folder"
 **Basic Album/Playlist Download:**
 ```bash
 python -m qobuz_dl dl [https://play.qobuz.com/album/qxjbxh1dc3xyb](https://play.qobuz.com/album/qxjbxh1dc3xyb)
+```
+
+**Explode Playlists into Albums:**
+By default, playlists are downloaded into a single flat folder. Use this flag if you use playlists as a "discovery tool" and want the engine to dynamically route every single track into its respective original Album folder, complete with its specific cover art and original track metadata.
+```bash
+python -m qobuz_dl dl "PLAYLIST_URL" --playlist-as-albums
 ```
 
 **Mass/Batch Downloading (Smart Resume):**
@@ -348,6 +355,9 @@ You can deeply customize your `config.ini` or use the CLI flags `-ff` (Folder Fo
 | `{year}` | The release year. | `2013` |
 | `{release_date}` | The full original release date. | `2013-05-17` |
 | **Technical Specs** | | |
+| `{media_type}` | Raw product type extracted from the API (capitalized). | `Album` |
+| `{quality_tag}` | Smart tag combining format and bit depth (clean MP3 fallback). | `FLAC 24` |
+| `{album_url}` | The official Qobuz URL of the release. | `https://play.qobuz.com/...` |
 | `{bit_depth}` | The audio bit depth. | `24` |
 | `{sampling_rate}` | The audio sampling rate in kHz. | `88.2` |
 | `{format}` | The downloaded file format. | `FLAC` |
