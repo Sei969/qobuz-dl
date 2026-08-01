@@ -56,7 +56,7 @@ def make_m3u(pl_directory, remote_items=None):
 
     track_list = ["#EXTM3U"]
     rel_folder = os.path.basename(os.path.normpath(pl_directory))
-    pl_name = rel_folder + ".m3u"
+    pl_name = rel_folder + ".m3u8"
     pl_full_path = os.path.join(pl_directory, pl_name)
 
     # 1. Scan the local folder and extract deep tags

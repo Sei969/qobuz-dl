@@ -44,15 +44,26 @@ def sync_database(directory, db_path, client):
             try:
                 if file_path.lower().endswith(".flac"):
                     audio = FLAC(file_path)
-                    track_id = audio.get("QOBUZTRACKID", [None])[0]
-                    album_id = audio.get("QOBUZALBUMID", [None])[0]
+                    
+                    # --- RICERCA GERARCHICA FLAC (Stealth -> Legacy) ---
+                    track_id_list = audio.get("QDL_TRACK_ID") or audio.get("QOBUZTRACKID") or [None]
+                    track_id = track_id_list[0]
+                    
+                    album_id_list = audio.get("QDL_ALBUM_ID") or audio.get("QOBUZALBUMID") or [None]
+                    album_id = album_id_list[0]
+                    
                     isrc = audio.get("isrc", [None])[0]
+                    
                 elif file_path.lower().endswith(".mp3"):
                     audio = ID3(file_path)
-                    track_txxx = audio.get("TXXX:QOBUZTRACKID")
+                    
+                    # --- RICERCA GERARCHICA MP3 (Stealth -> Legacy) ---
+                    track_txxx = audio.get("TXXX:QDL_TRACK_ID") or audio.get("TXXX:qdl_track_id") or audio.get("TXXX:QOBUZTRACKID")
                     if track_txxx: track_id = track_txxx.text[0]
-                    album_txxx = audio.get("TXXX:QOBUZALBUMID")
+                    
+                    album_txxx = audio.get("TXXX:QDL_ALBUM_ID") or audio.get("TXXX:qdl_album_id") or audio.get("TXXX:QOBUZALBUMID")
                     if album_txxx: album_id = album_txxx.text[0]
+                    
                     tsrc = audio.get("TSRC")
                     if tsrc: isrc = tsrc.text[0]
                 

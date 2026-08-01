@@ -22,12 +22,13 @@ def _scan_local_tracks(directory):
             try:
                 if fpath.lower().endswith('.flac'):
                     audio = FLAC(fpath)
-                    track_id = audio.get("QOBUZTRACKID", [None])[0]
+                    track_id_list = audio.get("QDL_TRACK_ID") or audio.get("QOBUZTRACKID") or [None]
+                    track_id = track_id_list[0]
                 else:
                     audio = ID3(fpath)
-                    txxx = audio.get("TXXX:QOBUZTRACKID")
-                    if txxx:
-                        track_id = txxx.text[0]
+                    track_txxx = audio.get("TXXX:QDL_TRACK_ID") or audio.get("TXXX:qdl_track_id") or audio.get("TXXX:QOBUZTRACKID")
+                    if track_txxx:
+                        track_id = track_txxx.text[0]
             except Exception as e:
                 logger.debug(f"Failed to read tags from {fpath}: {e}")
 

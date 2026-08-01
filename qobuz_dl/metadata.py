@@ -35,9 +35,9 @@ ID3_LEGEND = {
     "year": id3.TYER,
     "performer": id3.TOPE,
     # --- DB SYNC FEATURE: CUSTOM QOBUZ IDS ---
-    "QOBUZ TRACK ID": id3.TXXX,
-    "QOBUZ ALBUM ID": id3.TXXX,
-    "QOBUZ ALBUM URL": id3.TXXX,
+    "qdl_track_id": id3.TXXX,
+    "qdl_album_id": id3.TXXX,
+    "qdl_album_url": id3.TXXX,
     # --- REPLAYGAIN ---
     "replaygain_track_gain": id3.TXXX,
     "replaygain_track_peak": id3.TXXX,
@@ -414,17 +414,17 @@ def _get_tags_to_add(qobuz_album: dict, qobuz_item : dict, settings: QobuzDLSett
     # --- DB SYNC FEATURE: SAVE QOBUZ IDS ---
     track_id = qobuz_item.get("id")
     if track_id:
-        tags["QOBUZTRACKID"] = str(track_id)
+        tags["QDL_TRACK_ID"] = str(track_id)
         
     album_id = qobuz_album.get("id")
     if album_id:
-        tags["QOBUZALBUMID"] = str(album_id)
+        tags["QDL_ALBUM_ID"] = str(album_id)
 
     # --- DIRECT ALBUM URL TAGGING ---
     if not getattr(settings, 'no_album_url_tag', False):
         if album_id:
             raw_title = str(qobuz_album.get("title", "album"))
             slug = re.sub(r'[^a-z0-9]+', '-', raw_title.lower()).strip('-')
-            tags["QOBUZ ALBUM URL"] = f"https://www.qobuz.com/album/{slug}/{album_id}"
+            tags["QDL_ALBUM_URL"] = f"https://www.qobuz.com/album/{slug}/{album_id}"
 
     return tags
