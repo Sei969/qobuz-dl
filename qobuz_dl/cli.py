@@ -38,6 +38,16 @@ KEYRING_SERVICE = "qobuz-dl"
 
 
 def _keyring_save(key, value):
+    """
+    Securely stores a credential in the operating system's native Credential Manager.
+
+    Args:
+        key (str): The credential identifier (e.g., 'auth_token').
+        value (str): The sensitive token or password to store.
+
+    Returns:
+        bool: True if the credential was successfully saved, False otherwise.
+    """
     if not value:
         return False
     try:
@@ -48,6 +58,15 @@ def _keyring_save(key, value):
 
 
 def _keyring_load(key):
+    """
+    Retrieves a stored credential from the OS Credential Manager.
+
+    Args:
+        key (str): The credential identifier to retrieve.
+
+    Returns:
+        str or None: The stored credential, or None if not found or on error.
+    """
     try:
         return keyring.get_password(KEYRING_SERVICE, key)
     except Exception:
@@ -56,8 +75,14 @@ def _keyring_load(key):
 
 def validate_config_formats(formats_to_check):
     """
+    Pre-Flight Config Validation.
+    
     Scans the configuration format strings for unknown variables to prevent
-    silent KeyErrors during the download process. Includes typo suggestions.
+    silent KeyErrors during the download process. Implements a heuristic engine 
+    using difflib to suggest typing corrections to the user.
+
+    Args:
+        formats_to_check (dict): A dictionary mapping format setting names to their string values.
     """
     VALID_KEYS = {
         "artist", "album", "album_id", "album_url", "album_title", 
@@ -111,6 +136,14 @@ def validate_config_formats(formats_to_check):
 
 
 def _reset_config(config_file):
+    """
+    Interactive configuration wizard for initializing or resetting the config.ini file.
+    
+    Prompts the user for authentication tokens, folder preferences, and Keyring settings.
+
+    Args:
+        config_file (str): The absolute path where the config.ini should be saved.
+    """
     logging.info(f"\n{YELLOW}--- QOBUZ-DL CONFIGURATION WIZARD (2026 Update) ---{OFF}")
     config = configparser.ConfigParser(interpolation=None)
     
@@ -234,6 +267,12 @@ def _reset_config(config_file):
     
 
 def _remove_leftovers(directory):
+    """
+    Cleans up any partial or temporary files (~tmp_*.tmp) left behind after an interruption.
+
+    Args:
+        directory (str): The root directory to scan for temporary files.
+    """
     for pattern in [".*.tmp", "~tmp_*.tmp"]:
         search_dir = os.path.join(directory, "**", pattern)
         for i in glob.glob(search_dir, recursive=True):
@@ -244,6 +283,16 @@ def _remove_leftovers(directory):
 
 
 def _handle_commands(qobuz, arguments):
+    """
+    Routes parsed command-line arguments to the appropriate QobuzDL core methods.
+    
+    Implements the Terminal Recovery & CTRL+C Shield (Signal Hijacking) to safely 
+    catch interruptions and prevent terminal state corruption.
+
+    Args:
+        qobuz (QobuzDL): The initialized QobuzDL core instance.
+        arguments (Namespace): The parsed command-line arguments.
+    """
     def sigint_handler(sig, frame):
         print(f"\n\n\033[91m[!] Download forcibly interrupted by the user.\033[0m")
         print(f"\033[93mPartially downloaded files will be ignored or overwritten on the next run.\033[0m")
@@ -282,6 +331,7 @@ def _handle_commands(qobuz, arguments):
 
 
 def _initial_checks():
+    """Verifies the existence of the configuration file and basic CLI inputs."""
     if not os.path.isdir(CONFIG_PATH) or not os.path.isfile(CONFIG_FILE):
         os.makedirs(CONFIG_PATH, exist_ok=True)
         if "-r" not in sys.argv and "--reset" not in sys.argv:
@@ -291,6 +341,7 @@ def _initial_checks():
         sys.exit(qobuz_dl_args().print_help())
 
 def check_for_updates():
+    """Queries the GitHub API to notify the user of new Qobuz-DL Ultimate Edition releases."""
     try:
         from qobuz_dl import __version__
         
@@ -314,6 +365,12 @@ def check_for_updates():
         pass
 
 def main():
+    """
+    The main entry point for the Qobuz-DL Ultimate Edition CLI.
+    
+    Orchestrates configuration parsing, update checks, and routes standalone 
+    modules (Radar, Stats, Retro Lyrics) before initializing the main core application.
+    """
     _initial_checks()
     check_for_updates()
 

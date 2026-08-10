@@ -35,9 +35,9 @@ ID3_LEGEND = {
     "year": id3.TYER,
     "performer": id3.TOPE,
     # --- DB SYNC FEATURE: CUSTOM QOBUZ IDS ---
-    "qdl_track_id": id3.TXXX,
-    "qdl_album_id": id3.TXXX,
-    "qdl_album_url": id3.TXXX,
+    "QOBUZ TRACK ID": id3.TXXX,
+    "QOBUZ ALBUM ID": id3.TXXX,
+    "QOBUZ ALBUM URL": id3.TXXX,
     # --- REPLAYGAIN ---
     "replaygain_track_gain": id3.TXXX,
     "replaygain_track_peak": id3.TXXX,
@@ -90,6 +90,16 @@ LOCAL_GENRE_MAP = {
 }
 
 def _get_title_with_version(title: str = "", version: str = "") -> str:
+    """
+    Constructs a track or album title by appending its version if it exists.
+
+    Args:
+        title (str, optional): The original title. Defaults to "".
+        version (str, optional): The version of the track/album (e.g., 'Remastered'). Defaults to "".
+
+    Returns:
+        str: The combined title and version string.
+    """
     item_title = title
     if version:
         item_title = (
@@ -101,6 +111,15 @@ def _get_title_with_version(title: str = "", version: str = "") -> str:
 
 
 def _get_title(track_dict):
+    """
+    Constructs a comprehensive title for a track, including version and classical work prefixes.
+
+    Args:
+        track_dict (dict): The dictionary containing track metadata.
+
+    Returns:
+        str: The fully formatted title string.
+    """
     title = track_dict["title"]
     version = track_dict.get("version")
     if version:
@@ -113,6 +132,15 @@ def _get_title(track_dict):
 
 
 def _format_copyright(s: str) -> str:
+    """
+    Replaces standard text copyright symbols with their Unicode equivalents.
+
+    Args:
+        s (str): The original copyright string containing '(P)' or '(C)'.
+
+    Returns:
+        str: The formatted copyright string with Unicode symbols.
+    """
     if s:
         s = s.replace("(P)", PHON_COPYRIGHT)
         s = s.replace("(C)", COPYRIGHT)
@@ -120,6 +148,15 @@ def _format_copyright(s: str) -> str:
 
 
 def _format_genres(genres: list) -> str:
+    """
+    Cleans and formats a list of genres, removing duplicates and extracting primary names.
+
+    Args:
+        genres (list): A list of genre strings from the Qobuz API.
+
+    Returns:
+        str: A comma-separated string of unique, formatted genres.
+    """
     genres = re.findall(r"([^\u2192\/]+)", "/".join(genres))
     no_repeats = []
     [no_repeats.append(g) for g in genres if g not in no_repeats]
@@ -127,6 +164,16 @@ def _format_genres(genres: list) -> str:
 
 
 def _embed_flac_img(root_dir, audio: FLAC):
+    """
+    Embeds a cover image into a FLAC audio file.
+
+    Ensures the image does not exceed the maximum allowed block size for FLAC metadata 
+    to prevent encoding errors.
+
+    Args:
+        root_dir (str): The directory containing the audio file and cover image.
+        audio (FLAC): The Mutagen FLAC audio object to be tagged.
+    """
     emb_image = os.path.join(root_dir, EMB_COVER_NAME)
     multi_emb_image = os.path.join(
         os.path.abspath(os.path.join(root_dir, os.pardir)), EMB_COVER_NAME
@@ -159,6 +206,13 @@ def _embed_flac_img(root_dir, audio: FLAC):
 
 
 def _embed_id3_img(root_dir, audio: id3.ID3):
+    """
+    Embeds a cover image into an MP3 file using ID3 tags.
+
+    Args:
+        root_dir (str): The directory containing the audio file and cover image.
+        audio (id3.ID3): The Mutagen ID3 audio object to be tagged.
+    """
     emb_image = os.path.join(root_dir, EMB_COVER_NAME)
     multi_emb_image = os.path.join(
         os.path.abspath(os.path.join(root_dir, os.pardir)), EMB_COVER_NAME
@@ -179,6 +233,23 @@ def _embed_id3_img(root_dir, audio: id3.ID3):
 def tag_flac(
     filename, root_dir, final_name, d: dict, album, istrack=True, em_image=False, settings: QobuzDLSettings = None
 ):
+    """
+    Applies metadata tags and cover art to a FLAC audio file.
+
+    Supports advanced tagging features including multi-value tags, ReplayGain injections, 
+    and custom Qobuz IDs for local database synchronization. Renames the file to its 
+    final destination upon completion.
+
+    Args:
+        filename (str): The current path to the audio file.
+        root_dir (str): The directory where the file and cover image are located.
+        final_name (str): The final designated filename after tagging is complete.
+        d (dict): The track or album dictionary containing metadata.
+        album (dict): The dictionary containing album-level metadata.
+        istrack (bool, optional): Indicates if the file is a single track. Defaults to True.
+        em_image (bool, optional): Flag to enable embedding the cover image. Defaults to False.
+        settings (QobuzDLSettings, optional): Configuration object for user preferences. Defaults to None.
+    """
     audio = FLAC(filename)
 
     if istrack:
@@ -224,6 +295,22 @@ def tag_flac(
 
 
 def tag_mp3(filename, root_dir, final_name, d, album, istrack=True, em_image=False, settings: QobuzDLSettings = None):
+    """
+    Applies ID3 metadata tags and cover art to an MP3 audio file.
+
+    Maps custom Qobuz metadata to corresponding ID3 legends and handles standard track 
+    and disc numbering. Renames the file upon completion.
+
+    Args:
+        filename (str): The current path to the audio file.
+        root_dir (str): The directory where the file and cover image are located.
+        final_name (str): The final designated filename after tagging is complete.
+        d (dict): The track or album dictionary containing metadata.
+        album (dict): The dictionary containing album-level metadata.
+        istrack (bool, optional): Indicates if the file is a single track. Defaults to True.
+        em_image (bool, optional): Flag to enable embedding the cover image. Defaults to False.
+        settings (QobuzDLSettings, optional): Configuration object for user preferences. Defaults to None.
+    """
     try:
         audio = id3.ID3(filename)
     except ID3NoHeaderError:
@@ -263,6 +350,22 @@ def tag_mp3(filename, root_dir, final_name, d, album, istrack=True, em_image=Fal
 
 
 def _get_tags_to_add(qobuz_album: dict, qobuz_item : dict, settings: QobuzDLSettings = None):
+    """
+    Extracts and maps metadata from Qobuz API responses into a standardized tag dictionary.
+
+    This core engine processes native Qobuz data including Classical music roles, 
+    ReplayGain track/peak values, multi-artist matrices, and custom Qobuz IDs, 
+    adhering strictly to the provided configuration flags.
+
+    Args:
+        qobuz_album (dict): The dictionary containing album-level metadata.
+        qobuz_item (dict): The dictionary containing track-level metadata.
+        settings (QobuzDLSettings, optional): Configuration object containing user preferences 
+            (e.g., flags to disable specific tags). Defaults to None.
+
+    Returns:
+        dict: A dictionary mapping standardized tag keys to their corresponding extracted values.
+    """
     tags = dict()
     if not qobuz_album or not qobuz_item:
         return tags
@@ -392,16 +495,13 @@ def _get_tags_to_add(qobuz_album: dict, qobuz_item : dict, settings: QobuzDLSett
     
     if performers_str:
         for performer_block in performers_str.split(" - "):
-            # Separa il nome dai ruoli usando la virgola
             parts = [p.strip() for p in performer_block.split(", ")]
             if len(parts) > 1:
                 name = parts[0]
                 roles = parts[1:]
                 
-                # Se tra i ruoli c'è il Direttore
                 if "Conductor" in roles:
                     conductors.append(name)
-                # Se tra i ruoli c'è un'Orchestra o un Coro
                 if any(role in roles for role in ["Orchestra", "Ensemble", "Choir"]):
                     ensembles.append(name)
 
@@ -414,17 +514,17 @@ def _get_tags_to_add(qobuz_album: dict, qobuz_item : dict, settings: QobuzDLSett
     # --- DB SYNC FEATURE: SAVE QOBUZ IDS ---
     track_id = qobuz_item.get("id")
     if track_id:
-        tags["QDL_TRACK_ID"] = str(track_id)
+        tags["QOBUZTRACKID"] = str(track_id)
         
     album_id = qobuz_album.get("id")
     if album_id:
-        tags["QDL_ALBUM_ID"] = str(album_id)
+        tags["QOBUZALBUMID"] = str(album_id)
 
     # --- DIRECT ALBUM URL TAGGING ---
     if not getattr(settings, 'no_album_url_tag', False):
         if album_id:
             raw_title = str(qobuz_album.get("title", "album"))
             slug = re.sub(r'[^a-z0-9]+', '-', raw_title.lower()).strip('-')
-            tags["QDL_ALBUM_URL"] = f"https://www.qobuz.com/album/{slug}/{album_id}"
+            tags["QOBUZ ALBUM URL"] = f"https://www.qobuz.com/album/{slug}/{album_id}"
 
     return tags

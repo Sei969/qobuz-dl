@@ -2,6 +2,19 @@ import argparse
 
 
 def fun_args(subparsers, default_limit):
+    """
+    Configures the 'interactive' command-line subparser.
+    
+    This mode launches the Native Interactive Menu, allowing users to search 
+    and browse the Qobuz catalog or their private Favorites interactively.
+
+    Args:
+        subparsers (_SubParsersAction): The argparse subparsers object.
+        default_limit (int): The default maximum number of search results to display.
+
+    Returns:
+        ArgumentParser: The configured interactive subparser.
+    """
     interactive = subparsers.add_parser(
         "interactive",
         description="Interactively search for tracks and albums.",
@@ -19,6 +32,18 @@ def fun_args(subparsers, default_limit):
 
 
 def lucky_args(subparsers):
+    """
+    Configures the 'lucky' command-line subparser.
+    
+    Automatically downloads the top search result(s) for a given query, bypassing 
+    interactive selection.
+
+    Args:
+        subparsers (_SubParsersAction): The argparse subparsers object.
+
+    Returns:
+        ArgumentParser: The configured lucky subparser.
+    """
     lucky = subparsers.add_parser(
         "lucky",
         description="Download the first <n> albums returned from a Qobuz search.",
@@ -42,6 +67,19 @@ def lucky_args(subparsers):
 
 
 def dl_args(subparsers):
+    """
+    Configures the 'dl' (download) command-line subparser.
+    
+    The primary engine entry point. Supports direct Qobuz URLs, Last.fm playlist URLs 
+    (Fuzzy Matching), and text files for Stateful Batch Downloading. Also implements 
+    the Anti-Spam Blacklist Engine.
+
+    Args:
+        subparsers (_SubParsersAction): The argparse subparsers object.
+
+    Returns:
+        ArgumentParser: The configured download subparser.
+    """
     download = subparsers.add_parser(
         "dl",
         description="Download by album/track/artist/label/playlist/last.fm-playlist URL.",
@@ -67,6 +105,18 @@ def dl_args(subparsers):
     return download
 
 def lyrics_args(subparsers):
+    """
+    Configures the 'lyrics' command-line subparser for retroactive lyrics injection.
+    
+    Allows the user to scan an existing local library and fetch/inject missing 
+    synchronized lyrics via the Roon-Ready Lyrics Engine.
+
+    Args:
+        subparsers (_SubParsersAction): The argparse subparsers object.
+
+    Returns:
+        ArgumentParser: The configured lyrics subparser.
+    """
     lyrics = subparsers.add_parser(
         "lyrics",
         description="Retroactively scan a directory and inject missing lyrics into existing audio files.",
@@ -80,6 +130,18 @@ def lyrics_args(subparsers):
     return lyrics
 
 def sync_playlist_args(subparsers):
+    """
+    Configures the 'sync-playlist' command-line subparser.
+    
+    Initiates the Bidirectional Playlist Sync ("mirror mode"), downloading missing 
+    tracks and physically deleting orphan tracks from the local directory.
+
+    Args:
+        subparsers (_SubParsersAction): The argparse subparsers object.
+
+    Returns:
+        ArgumentParser: The configured sync-playlist subparser.
+    """
     sync_pl = subparsers.add_parser(
         "sync-playlist",
         aliases=["sp"],
@@ -99,6 +161,17 @@ def sync_playlist_args(subparsers):
     return sync_pl
 
 def add_common_arg(custom_parser, default_folder, default_quality):
+    """
+    Appends global arguments to a specific subparser.
+    
+    Injects all standard settings flags (e.g., quality, directories, tag toggles, 
+    cover art sizes, and delay limits) into the given command parser.
+
+    Args:
+        custom_parser (ArgumentParser): The target parser to mutate.
+        default_folder (str): The fallback output directory path.
+        default_quality (int): The fallback audio quality ID.
+    """
     custom_parser.add_argument(
         "-d",
         "--directory",
@@ -404,6 +477,20 @@ def add_common_arg(custom_parser, default_folder, default_quality):
 def qobuz_dl_args(
     default_quality=6, default_limit=20, default_folder="QobuzDownloads"
 ):
+    """
+    Initializes and constructs the main argument parser for Qobuz-DL Ultimate Edition.
+    
+    Sets up the top-level CLI interface, registers global arguments (e.g., config resets, 
+    database purges, standalone module triggers), and binds all subsequent subparsers.
+
+    Args:
+        default_quality (int, optional): The default quality format ID. Defaults to 6.
+        default_limit (int, optional): The default query result limit. Defaults to 20.
+        default_folder (str, optional): The default base download directory. Defaults to "QobuzDownloads".
+
+    Returns:
+        ArgumentParser: The fully configured master argparse object.
+    """
     parser = argparse.ArgumentParser(
         prog="qobuz-dl",
         description=(

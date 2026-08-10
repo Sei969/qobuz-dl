@@ -7,6 +7,18 @@ logger = logging.getLogger(__name__)
 
 
 def create_db(db_path):
+    """
+    Initializes or upgrades the SQLite database used for the Smart Reverse Lookup feature.
+
+    Handles legacy migrations (e.g., v1 to v2, adding quality/format columns) 
+    and recent schema upgrades (e.g., adding artist and album columns).
+
+    Args:
+        db_path (str): The file path where the SQLite database is or will be stored.
+
+    Returns:
+        str: The path to the successfully initialized database.
+    """
     with sqlite3.connect(db_path) as conn:
         cursor = conn.cursor()
         
@@ -96,6 +108,29 @@ def create_db(db_path):
 def handle_download_id(db_path, item_id, add_id=False, media_type='album', quality=27, file_format='FLAC',
                        quality_met=0, bit_depth=None, sampling_rate=None, saved_path='', status='downloaded',
                        url='', release_date='', artist='', album=''):
+    """
+    Checks for existing downloads or inserts new completed downloads into the database.
+
+    Args:
+        db_path (str): The file path to the SQLite database.
+        item_id (str): The unique Qobuz ID of the track or album.
+        add_id (bool, optional): If True, inserts a new record. If False, queries for existence. Defaults to False.
+        media_type (str, optional): 'album' or 'track'. Defaults to 'album'.
+        quality (int, optional): The requested audio quality ID. Defaults to 27.
+        file_format (str, optional): The actual downloaded format (e.g., 'FLAC', 'MP3'). Defaults to 'FLAC'.
+        quality_met (int, optional): Flag indicating if the requested quality was achieved (1 or 0). Defaults to 0.
+        bit_depth (str, optional): Audio bit depth. Defaults to None.
+        sampling_rate (str, optional): Audio sampling rate. Defaults to None.
+        saved_path (str, optional): The local file system path where the item was saved. Defaults to ''.
+        status (str, optional): The download status. Defaults to 'downloaded'.
+        url (str, optional): The original Qobuz URL. Defaults to ''.
+        release_date (str, optional): The item's release date. Defaults to ''.
+        artist (str, optional): The main artist's name. Defaults to ''.
+        album (str, optional): The album's title. Defaults to ''.
+
+    Returns:
+        tuple or None: If add_id is False, returns a tuple containing the ID if found, otherwise None.
+    """
     if not db_path:
         return
 
@@ -124,7 +159,15 @@ def handle_download_id(db_path, item_id, add_id=False, media_type='album', quali
  
  
 def get_stats(db_path):
-    """Returns a list of unique artists from the database."""
+    """
+    Retrieves statistical information from the database, specifically a list of unique downloaded artists.
+
+    Args:
+        db_path (str): The file path to the SQLite database.
+
+    Returns:
+        list: A sorted list of unique artist names present in the database. Returns an empty list on failure.
+    """
     if not db_path:
         return []
     try:
@@ -134,4 +177,4 @@ def get_stats(db_path):
             cursor.execute("SELECT DISTINCT artist FROM downloads WHERE artist != '' ORDER BY artist ASC")
             return [row[0] for row in cursor.fetchall()]
     except sqlite3.Error:
-        return []            
+        return []

@@ -17,6 +17,10 @@ EXTENSIONS = (".mp3", ".flac")
 
 
 class PartialFormatter(string.Formatter):
+    """
+    A custom string formatter that safely handles missing variables during string evaluation.
+    Prevents KeyErrors when a requested metadata tag is missing from the API response.
+    """
     def __init__(self, missing="n/a", bad_fmt="n/a"):
         self.missing, self.bad_fmt = missing, bad_fmt
 
@@ -39,10 +43,15 @@ class PartialFormatter(string.Formatter):
 
 def make_m3u(pl_directory, remote_items=None):
     """
-    Generates a .m3u playlist file.
-    If remote_items (Qobuz API playlist order) is provided, it matches the files
-    using a robust 4-pass algorithm (ID -> ISRC -> Title -> Filename) to preserve 
-    the exact online order, ignoring physical filenames.
+    Generates a UTF-8 encoded .m3u8 playlist file.
+    
+    If remote_items (Qobuz API playlist order) is provided, it utilizes a robust O(1) 
+    4-pass matching algorithm (ID -> ISRC -> Title -> Filename) to preserve the exact 
+    online track order, completely ignoring physical local filenames.
+
+    Args:
+        pl_directory (str): The local directory containing the downloaded audio files.
+        remote_items (list, optional): The list of track dictionaries from the Qobuz API. Defaults to None.
     """
     import os
     import re
@@ -182,18 +191,24 @@ def make_m3u(pl_directory, remote_items=None):
 def smart_discography_filter(
     contents: list, save_space: bool = False, skip_extras: bool = False
 ) -> list:
-    """When downloading some artists' discography, many random and spam-like
-    albums can get downloaded. This helps filter those out to just get the good stuff.
+    """
+    Heuristic Engine for intelligent discography filtering.
+    
+    When downloading some artists' discography, many random and spam-like
+    albums can get downloaded. This filters out duplicates and unwanted releases.
 
     This function removes:
         * albums by other artists, which may contain a feature from the requested artist
         * duplicate albums in different qualities
         * (optionally) removes collector's, deluxe, live albums
 
-    :param list contents: contents returned by qobuz API
-    :param bool save_space: choose highest bit depth, lowest sampling rate
-    :param bool remove_extras: remove albums with extra material (i.e. live, deluxe,...)
-    :returns: filtered items list
+    Args:
+        contents (list): Contents returned by Qobuz API.
+        save_space (bool): If True, chooses highest bit depth but lowest sampling rate.
+        skip_extras (bool): If True, removes albums with extra material (i.e. live, deluxe).
+
+    Returns:
+        list: The filtered items list.
     """
 
     # for debugging
@@ -269,25 +284,49 @@ def smart_discography_filter(
 
 
 def format_duration(duration):
+    """
+    Formats a duration given in seconds into a HH:MM:SS string.
+    
+    Args:
+        duration (int): The duration in seconds.
+        
+    Returns:
+        str: The formatted time string.
+    """
     return time.strftime("%H:%M:%S", time.gmtime(duration))
 
 
 def create_and_return_dir(directory):
+    """
+    Safely creates a directory path and returns its absolute path.
+    
+    Args:
+        directory (str): The desired directory path.
+        
+    Returns:
+        str: The absolute path of the created directory.
+    """
     fix = os.path.abspath(os.path.expanduser(directory))
     os.makedirs(fix, exist_ok=True)
     return fix
 
 
 def get_url_info(url):
-    """Returns the type of the url and the id.
+    """
+    Parses a Qobuz URL to extract the media type and ID using regular expressions.
 
     Compatible with urls of the form:
         https://www.qobuz.com/us-en/{type}/{name}/{id}
         https://open.qobuz.com/{type}/{id}
         https://play.qobuz.com/{type}/{id}
         /us-en/{type}/-/{id}
+        
+    Args:
+        url (str): The input URL string.
+        
+    Returns:
+        tuple: A tuple containing the extracted type (e.g., 'album', 'track') and the ID.
     """
-
     r = re.search(
         r"(?:https:\/\/(?:w{3}|open|play)\.qobuz\.com)?(?:\/[a-z]{2}-[a-z]{2})"
         r"?\/(album|artist|track|playlist|label)(?:\/[-\w\d]+)?\/([\w\d]+)",
@@ -298,11 +337,15 @@ def get_url_info(url):
 
 def get_album_artist(qobuz_album: dict) -> list:
     """
-    Get the album's main artists from the Qobuz API response.
-    Returns a LIST of strings to ensure true Multi-Artist Tagging 
+    Extracts the album's main artists from the Qobuz API response.
+    Returns a list of strings to ensure true Native Multi-Artist Tagging 
     (discrete Vorbis Comments for FLAC files).
-    :param qobuz_album: Qobuz API response.
-    :return: A list of the album's main artists.
+    
+    Args:
+        qobuz_album (dict): Qobuz API response dictionary.
+        
+    Returns:
+        list: A list of the album's main artists.
     """
     try:
         # Se la chiave 'artists' non esiste, ritorna il singolo artista in una lista
@@ -329,8 +372,14 @@ def get_album_artist(qobuz_album: dict) -> list:
 
 def apply_legacy_charmap(filename: str) -> str:
     """
-    Apply legacy character replacement rules for Windows path compatibility.
+    Applies legacy character replacement rules for Windows path compatibility.
     Specifically requested for users who prefer standard ASCII over Unicode fullwidth characters.
+    
+    Args:
+        filename (str): The raw string.
+        
+    Returns:
+        str: The sanitized string utilizing basic ASCII replacements.
     """
     # Specific rules requested by the community (JosiahDanger)
     filename = filename.replace(':', '-')
@@ -353,11 +402,15 @@ def apply_legacy_charmap(filename: str) -> str:
 
 def clean_filename(filename: str, legacy_charmap: bool = False) -> str:
     """
-    Clean up redundant special characters, spaces, separators in filenames
-    and normalize Unicode characters to NFC form
-    :param filename:
-    :param legacy_charmap: If True, uses basic ASCII replacements instead of Unicode fullwidth characters
-    :return:
+    Cleans up redundant special characters, spaces, and separators in filenames.
+    Normalizes Unicode characters to NFC form to ensure cross-platform safety.
+    
+    Args:
+        filename (str): The raw string to clean.
+        legacy_charmap (bool, optional): If True, uses basic ASCII replacements instead of Unicode full-width characters. Defaults to False.
+        
+    Returns:
+        str: The fully sanitized filename string.
     """
     # First normalize the Unicode string to NFC form
     filename = unicodedata.normalize('NFC', filename)
@@ -407,9 +460,13 @@ def clean_filename(filename: str, legacy_charmap: bool = False) -> str:
 
 def invalid_chars_to_fullwidth(filename):
     """
-    Convert illegal characters in filenames to full-width characters
-    :param filename:
-    :return:
+    Converts illegal Windows filename characters to visually similar full-width Unicode characters.
+    
+    Args:
+        filename (str): The raw string.
+        
+    Returns:
+        str: The safely converted string.
     """
     # Illegal characters to full-width characters
     invalid_to_fullwidth = {

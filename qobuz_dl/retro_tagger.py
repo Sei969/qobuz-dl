@@ -11,6 +11,20 @@ from qobuz_dl.color import CYAN, GREEN, YELLOW, RED, OFF
 logger = logging.getLogger(__name__)
 
 def inject_lyrics_retroactively(directory_path, genius_token=None, settings=None):
+    """
+    Retroactively scans a local audio library to inject missing synchronized lyrics.
+
+    Iterates through all FLAC and MP3 files in the specified directory. If a file 
+    lacks existing lyrics but contains basic metadata (Title, Artist, Album), it 
+    invokes the Roon-Ready Lyrics Engine to fetch and embed the lyrics without 
+    redownloading the track.
+
+    Args:
+        directory_path (str): The absolute path to the local music directory to be scanned.
+        genius_token (str, optional): The Genius API token for fallback lyric searches. Defaults to None.
+        settings (QobuzDLSettings, optional): Configuration object to dictate embedding 
+            and file saving preferences (e.g., --no-lrc-files). Defaults to None.
+    """
     if settings is None:
         settings = QobuzDLSettings()
         

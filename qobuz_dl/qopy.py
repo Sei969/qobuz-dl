@@ -26,7 +26,26 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 class Client:
+    """
+    The core Qobuz API client for Qobuz-DL Ultimate Edition.
+
+    Handles secure authentication, Anti-Ban Stealth Spoofing (WAF bypass), cryptographic 
+    token unwrapping for Web Player segment streams, and dynamic metadata fetching. 
+    Supports both standard email/password authentication and secure user_auth_token injection.
+    """
+
     def __init__(self, email, pwd, app_id, secrets, user_auth_token=None, force_english=True):
+        """
+        Initializes the API client and sets up the resilient session.
+
+        Args:
+            email (str): The user's Qobuz account email.
+            pwd (str): The user's Qobuz account password.
+            app_id (str): The Qobuz Application ID.
+            secrets (list): A list of potential Qobuz App Secrets for authentication fallback.
+            user_auth_token (str, optional): A pre-existing authentication token to bypass login. Defaults to None.
+            force_english (bool, optional): Injects specific Client Hints and locales to avoid bans. Defaults to True.
+        """
         logger.info(f"{YELLOW}Logging...{OFF}")
         self.secrets = secrets
         self.id = str(app_id)
@@ -70,7 +89,7 @@ class Client:
         })
         self.base = "https://www.qobuz.com/api.json/0.2/"
         self.sec = None
-# Variables for encryption session management
+        # Variables for encryption session management
         self.session_id = None
         self.session_infos = None
         self.session_key = None
@@ -81,105 +100,17 @@ class Client:
         self.auth(email, pwd, user_auth_token)
         self.cfg_setup()
 
-    def api_call(self, epoint, **kwargs):
-        if epoint == "user/login":
-            if "user_auth_token" in kwargs and kwargs["user_auth_token"]:
-                params = {
-                    "user_auth_token": kwargs["user_auth_token"],
-                    "app_id": self.id,
-                }
-                logger.info(f"{YELLOW}Trying to login with user_auth_token{OFF}")
-            else:
-                params = {
-                    "email": kwargs["email"],
-                    "password": kwargs["pwd"],
-                    "app_id": self.id,
-                }
-                logger.info(f"{YELLOW}Trying to login with email/password{OFF}")
-            
-            # add debug info
-            logger.info(f"{YELLOW}Login params: {params}{OFF}")
-        elif epoint == "track/get":
-            params = {"track_id": kwargs["id"]}
-        elif epoint == "album/get":
-            params = {"album_id": kwargs["id"]}
-        elif epoint == "playlist/get":
-            params = {
-                "extra": "tracks",
-                "playlist_id": kwargs["id"],
-                "limit": 500,
-                "offset": kwargs["offset"],
-            }
-        elif epoint == "artist/get":
-            params = {
-                "app_id": self.id,
-                "artist_id": kwargs["id"],
-                "limit": 500,
-                "offset": kwargs["offset"],
-                "extra": "albums",
-            }
-        elif epoint == "label/get":
-            params = {
-                "label_id": kwargs["id"],
-                "limit": 500,
-                "offset": kwargs["offset"],
-                "extra": "albums",
-            }
-        elif epoint == "favorite/getUserFavorites":
-            unix = int(time.time())
-            r_sig = "favoritegetUserFavorites" + str(unix) + kwargs.get("sec", self.sec)
-            r_sig_hashed = hashlib.md5(r_sig.encode("utf-8")).hexdigest()
-            params = {
-                "app_id": self.id,
-                "user_auth_token": getattr(self, 'uat', None),
-                "type": kwargs.get("fav_type", "albums"), 
-                "limit": kwargs.get("limit", 100),
-                "offset": kwargs.get("offset", 0),
-                "request_ts": unix,
-                "request_sig": r_sig_hashed,
-            }
-        elif epoint == "track/getFileUrl":
-            unix = time.time()
-            track_id = kwargs["id"]
-            fmt_id = kwargs["fmt_id"]
-            if int(fmt_id) not in (5, 6, 7, 27):
-                raise InvalidQuality("Invalid quality id: choose between 5, 6, 7 or 27")
-            r_sig = "trackgetFileUrlformat_id{}intentstreamtrack_id{}{}{}".format(
-                fmt_id, track_id, unix, kwargs.get("sec", self.sec)
-            )
-            r_sig_hashed = hashlib.md5(r_sig.encode("utf-8")).hexdigest()
-            params = {
-                "request_ts": unix,
-                "request_sig": r_sig_hashed,
-                "track_id": track_id,
-                "format_id": fmt_id,
-                "intent": "stream",
-            }
-        else:
-            params = kwargs
-            
-        r = self.session.get(self.base + epoint, params=params)
-        
-        if epoint == "user/login":
-            if r.status_code == 401:
-                raise AuthenticationError("Invalid credentials.\n" + RESET)
-            elif r.status_code == 400:
-                raise InvalidAppIdError("Invalid app id.\n" + RESET)
-            else:
-                logger.info(f"{GREEN}Logged: OK{OFF}")
-        elif (
-            epoint in ["track/getFileUrl", "favorite/getUserFavorites"]
-            and r.status_code == 400
-        ):
-            raise InvalidAppSecretError(f"Invalid app secret: {r.json()}.\n" + RESET)
-        r.raise_for_status()
-        
-        # Unicode Normalization for JSON strings
-        json_data = r.json()
-        return self._normalize_json_strings(json_data)
-
     def _normalize_json_strings(self, obj):
-        """Recursively normalize Unicode strings in JSON objects (NFC form)"""
+        """
+        Recursively normalizes Unicode strings in JSON objects (NFC form).
+        Prevents encoding crashes and fixes Windows path limitations (e.g., trailing ellipses).
+
+        Args:
+            obj (mixed): The JSON dictionary, list, or string to normalize.
+
+        Returns:
+            mixed: The normalized object.
+        """
         if isinstance(obj, str):
             # --- WINDOWS PATH FIX: Convert '...' to Unicode Ellipsis (U+2026) ---
             # Avoid modifying URL links (which contain '://')
@@ -195,6 +126,14 @@ class Client:
             return obj
 
     def auth(self, email, pwd, user_auth_token=None):
+        """
+        Authenticates the user session with Qobuz and retrieves account metadata.
+
+        Args:
+            email (str): The user's email address.
+            pwd (str): The user's password.
+            user_auth_token (str, optional): Direct token to bypass credential check. Defaults to None.
+        """
         # If the token is present, skip the password!
         if user_auth_token:
             self.uat = user_auth_token
@@ -225,6 +164,17 @@ class Client:
 
     # NEW CRYPTOGRAPHIC FUNCTIONS (Patch 0004)
     def _modern_sig(self, epoint, params, sec):
+        """
+        Generates a modern MD5 signature for Qobuz protected endpoints.
+
+        Args:
+            epoint (str): The API endpoint path.
+            params (dict): The dictionary of request parameters.
+            sec (str): The application secret key.
+
+        Returns:
+            str: The computed MD5 signature hash.
+        """
         object_, method = epoint.split("/")
         r_sig = [object_, method]
         for key in sorted(params):
@@ -238,9 +188,17 @@ class Client:
 
     @staticmethod
     def _b64url_decode(value):
+        """Helper to decode base64 url-safe strings with proper padding."""
         return base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))
 
     def _derive_session_key(self):
+        """
+        Derives an AES session key using HKDF based on Qobuz session infos.
+        Used for decrypting Web Player stream chunks.
+
+        Returns:
+            bytes: The 16-byte derived session key.
+        """
         salt, info = self.session_infos.split(".")
         return HKDF(
             algorithm=hashes.SHA256(),
@@ -250,6 +208,15 @@ class Client:
         ).derive(bytes.fromhex(self.sec))
 
     def _unwrap_track_key(self, key_token):
+        """
+        Decrypts the AES wrapped track key provided by the API.
+
+        Args:
+            key_token (str): The encrypted key token string.
+
+        Returns:
+            bytes: The unwrapped, decrypted raw track key.
+        """
         _, wrapped, iv = key_token.split(".")
         decryptor = Cipher(
             algorithms.AES(self.session_key),
@@ -261,6 +228,24 @@ class Client:
 
     # NEW API_CALL ENGINE
     def api_call(self, epoint, **kwargs):
+        """
+        The central routing engine for all Qobuz API requests.
+        
+        Dynamically handles HTTP methods (GET/POST), cryptographic signing, error parsing, 
+        and automatic Unicode normalization for all responses.
+
+        Args:
+            epoint (str): The target Qobuz API endpoint (e.g., 'album/get').
+            **kwargs: Arbitrary keyword arguments corresponding to API parameters.
+
+        Raises:
+            AuthenticationError: On invalid login credentials.
+            InvalidAppIdError: On invalid App ID.
+            InvalidAppSecretError: On invalid App Secret.
+
+        Returns:
+            dict: The normalized JSON response from the Qobuz API.
+        """
         if epoint == "user/login":
             if "user_auth_token" in kwargs and kwargs["user_auth_token"]:
                 params = {
@@ -375,6 +360,18 @@ class Client:
         return self._normalize_json_strings(r.json())
 
     def multi_meta(self, epoint, key, id, type):
+        """
+        A generator that handles paginated API requests, automatically fetching chunks of 50 items.
+
+        Args:
+            epoint (str): The API endpoint (e.g., 'playlist/get').
+            key (str): The JSON key containing total counts (e.g., 'tracks_count').
+            id (str): The target ID (playlist ID, artist ID, etc.).
+            type (str): The expected data type in the response ('albums', 'tracks').
+
+        Yields:
+            dict: The dictionary containing the chunked API response block.
+        """
         offset = 0
         limit = 50
         
@@ -397,10 +394,23 @@ class Client:
 
     # --- METADATA FUNCTIONS (Do not delete!) ---
     def get_track_meta(self, id): 
+        """Fetches metadata for a single track."""
         return self.api_call("track/get", id=id)
 
     # --- NEW LAST.FM FUNCTIONS ---
     def get_track_ids_from_list(self, tracks_list: list) -> list:
+        """
+        Matches a list of external tracks (e.g., scraped from Last.fm) against the Qobuz database.
+
+        Uses a Fuzzy Matching Algorithm to compare artist and title strings.
+        Features an interactive terminal prompt for borderline matches (60%-74% similarity).
+
+        Args:
+            tracks_list (list): A list of dictionaries containing 'artist' and 'title' keys.
+
+        Returns:
+            list: A list of successfully matched Qobuz track IDs.
+        """
         from qobuz_dl.color import OFF, GREEN, RED, YELLOW, CYAN
         import difflib
         
@@ -470,26 +480,37 @@ class Client:
 
     # --- SEARCH FUNCTIONS (Crash-Proof) ---
     def search_albums(self, query, limit=20):
+        """Searches the Qobuz catalog for albums. Crash-proof against API timeouts."""
         try: return self.api_call("catalog/search", query=query, type="albums", limit=limit)
         except Exception: return {}
 
     def search_tracks(self, query, limit=20):
+        """Searches the Qobuz catalog for tracks. Crash-proof against API timeouts."""
         try: return self.api_call("catalog/search", query=query, type="tracks", limit=limit)
         except Exception: return {}
 
     def search_playlists(self, query, limit=20):
+        """Searches the Qobuz catalog for playlists. Crash-proof against API timeouts."""
         try: return self.api_call("catalog/search", query=query, type="playlists", limit=limit)
         except Exception: return {}
 
     def search_artists(self, query, limit=20):
+        """Searches the Qobuz catalog for artists. Crash-proof against API timeouts."""
         try: return self.api_call("catalog/search", query=query, type="artists", limit=limit)
         except Exception: return {}
 
     # --- NEW FAVORITES FUNCTION ---
     def get_favorites(self, fav_type="albums", limit=100, offset=0):
         """
-        Fetches user favorites dynamically. 
-        fav_type can be: 'albums', 'tracks', 'artists', 'playlists'
+        Fetches the authenticated user's favorites from their private library.
+
+        Args:
+            fav_type (str, optional): The type of favorites to fetch ('albums', 'tracks', 'artists', 'playlists'). Defaults to "albums".
+            limit (int, optional): The number of items to retrieve per call. Defaults to 100.
+            offset (int, optional): The pagination offset. Defaults to 0.
+
+        Returns:
+            dict: The API response containing the favorites list.
         """
         try: 
             return self.api_call("favorite/getUserFavorites", fav_type=fav_type, limit=limit, offset=offset)
@@ -498,7 +519,15 @@ class Client:
             return {}
             
     def add_favorite_album(self, album_id):
-        """Adds an album to the user's Qobuz favorites."""
+        """
+        Adds a specific album to the user's Qobuz favorites.
+
+        Args:
+            album_id (str): The Qobuz ID of the album to favorite.
+
+        Returns:
+            dict: The API response acknowledging the addition.
+        """
         return self.api_call(
             "favorite/create", 
             album_ids=str(album_id),
@@ -508,6 +537,21 @@ class Client:
         
     # NEW GET_TRACK_URL (Patch 0004)
     def get_track_url(self, id, fmt_id, force_segments=False):
+        """
+        Retrieves the streaming or download URL for a specific track.
+
+        Employs an intelligent fallback mechanism: attempts to fetch a fast Direct URL first, 
+        and if blocked by Qobuz CDNs, automatically falls back to the Segmented Web Player 
+        method (decrypting AES stream chunks).
+
+        Args:
+            id (str): The Qobuz track ID.
+            fmt_id (int): The audio format ID (e.g., 5 for MP3, 27 for Hi-Res FLAC).
+            force_segments (bool, optional): If True, bypasses Direct URL attempt. Defaults to False.
+
+        Returns:
+            dict: The track payload containing the URL or stream keys.
+        """
         # Quick fallback for MP3
         if int(fmt_id) == 5:
             return self.api_call("track/getFileUrl", id=id, fmt_id=fmt_id)
@@ -538,12 +582,27 @@ class Client:
             track["raw_key"] = self._unwrap_track_key(track["key"])
         return track
 
-    def get_artist_meta(self, id): return self.multi_meta("artist/get", "albums_count", id, None)
-    def get_plist_meta(self, id): return self.multi_meta("playlist/get", "tracks_count", id, None)
-    def get_label_meta(self, id): return self.multi_meta("label/get", "albums_count", id, None)
-    def get_album_meta(self, id): return self.api_call("album/get", id=id)
+    def get_artist_meta(self, id): 
+        """Fetches full metadata and discography for an artist."""
+        return self.multi_meta("artist/get", "albums_count", id, None)
+        
+    def get_plist_meta(self, id): 
+        """Fetches full metadata and tracklist for a playlist."""
+        return self.multi_meta("playlist/get", "tracks_count", id, None)
+        
+    def get_label_meta(self, id): 
+        """Fetches full metadata and release catalog for a record label."""
+        return self.multi_meta("label/get", "albums_count", id, None)
+        
+    def get_album_meta(self, id): 
+        """Fetches full metadata for a specific album."""
+        return self.api_call("album/get", id=id)
     
     def cfg_setup(self):
+        """
+        Validates available Application Secrets against the API to select the working one.
+        Raises an error if no valid secret is found.
+        """
         for secret in self.secrets:
             try:
                 self.api_call("track/getFileUrl", id=5966783, fmt_id=5, sec=secret)

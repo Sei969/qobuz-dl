@@ -1,7 +1,22 @@
 from qobuz_dl.constants import DEFAULT_FOLDER, DEFAULT_TRACK, DEFAULT_MULTIPLE_DISC_TRACK
 
 class QobuzDLSettings:
+    """
+    Central configuration object for Qobuz-DL Ultimate Edition.
+    
+    Maps and stores all user preferences, CLI flags, and config.ini variables. 
+    This object dictates the behavior of the Downloader, Tagger, and Sync engines, 
+    enforcing the 'Zero Hardcoding' philosophy across the entire application.
+    """
+    
     def __init__(self, **kwargs):
+        """
+        Initializes the configuration settings.
+        
+        Args:
+            **kwargs: Arbitrary keyword arguments containing all parsed configuration 
+                values (e.g., tagging flags, folder formats, thread counts).
+        """
         # basic options
         self.email = kwargs.get('email')
         self.password = kwargs.get('password')
@@ -70,14 +85,17 @@ class QobuzDLSettings:
 
     @staticmethod
     def from_arguments_configparser(arguments, config):
-        """Creating Configuration Objects from Command Line Parameters and Configuration Files
+        """
+        Factory method to construct a QobuzDLSettings object by merging command-line 
+        arguments with the config.ini file. CLI arguments inherently take precedence 
+        over config.ini values.
         
         Args:
-            arguments: Parsed command line arguments
-            config: ConfigParser object
+            arguments (argparse.Namespace): Parsed command line arguments from the CLI.
+            config (configparser.ConfigParser): The initialized ConfigParser object.
             
         Returns:
-            QobuzDLSettings: Configuration object
+            QobuzDLSettings: The fully resolved configuration object.
         """
         # Determine the correct section to read from config.ini
         section = "qobuz" if config.has_section("qobuz") else "DEFAULT"

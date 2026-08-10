@@ -32,6 +32,10 @@ print_lock = threading.Lock()
 abort_event = threading.Event()
 
 def safe_print(*args, **kwargs):
+    """
+    Thread-safe print function. Prevents UI glitches ("cursor wars") 
+    when multiple download threads attempt to log to the terminal simultaneously.
+    """
     with print_lock:
         text = " ".join(map(str, args))
         end = kwargs.get('end', '\n')
@@ -41,8 +45,14 @@ def safe_print(*args, **kwargs):
 def format_release_type(release_type: str) -> str:
     """
     Normalizes the release type from Qobuz APIs.
-    Converts 'ep' to 'EP', 'single' to 'Single', 'album' to 'Album', etc.
-    Returns 'Unknown' as a robust fallback if data is missing.
+    
+    Converts raw API strings (e.g., 'ep' to 'EP', 'single' to 'Single', 'album' to 'Album').
+    
+    Args:
+        release_type (str): The raw release type string from the API.
+
+    Returns:
+        str: The normalized release type, or 'Unknown' as a robust fallback.
     """
     if not release_type:
         return "Unknown"
@@ -55,6 +65,18 @@ def format_release_type(release_type: str) -> str:
 # --------------------------------------------------------
 
 def process_folder_format_with_subdirs(folder_format, attr_dict, path=None, legacy_charmap=False):
+    """
+    Parses and sanitizes the user's custom folder format string, generating a safe directory path.
+
+    Args:
+        folder_format (str): The format template string (e.g., "{album_artist}/{album_title}").
+        attr_dict (dict): The dictionary containing metadata attributes to format the string.
+        path (str, optional): The base destination path. Defaults to None.
+        legacy_charmap (bool, optional): If True, applies legacy character mapping. Defaults to False.
+
+    Returns:
+        str: The fully resolved and sanitized local directory path.
+    """
     path_parts = folder_format.split('/')
     cleaned_parts = []
     for part in path_parts:
@@ -109,6 +131,13 @@ logger.setLevel(logging.INFO)
 
 
 class Download:
+    """
+    The main Download engine handling the retrieval of audio files, booklets, and metadata.
+    
+    Features include multithreaded queueing, intelligent quality fallbacks, SIGINT hijacking 
+    for safe aborts, and on-the-fly metadata tagging.
+    """
+
     def __init__(
         self,
         client,
@@ -133,6 +162,32 @@ class Download:
         booklet_only: bool = False,
         playlist_as_albums: bool = False,
     ):
+        """
+        Initializes the Download class.
+
+        Args:
+            client: The authenticated Qobuz API client instance.
+            item_id (str): The target Qobuz ID (track or album).
+            path (str): Base destination directory.
+            quality (int): Requested audio quality format ID.
+            embed_art (bool): Flag to embed cover art inside audio tags.
+            albums_only (bool): If True, skips Singles and EPs.
+            downgrade_quality (bool): If True, automatically fetches lower quality if requested quality is unavailable.
+            cover_og_quality (bool): Flag to download original uncompressed cover art.
+            no_cover (bool): If True, skips cover art download completely.
+            folder_format (str, optional): Custom string format for the album folder.
+            track_format (str, optional): Custom string format for the track filenames.
+            fetch_lyrics (bool): Flag to fetch synchronized lyrics via LyricsEngine.
+            no_lrc_files (bool): If True, lyrics are embedded but not saved as separate .lrc files.
+            genius_token (str, optional): Authentication token for the Genius API.
+            no_credits (bool): If True, prevents Digital Booklet generation.
+            settings (QobuzDLSettings, optional): The application settings object.
+            download_db (str, optional): Path to the SQLite sync database.
+            is_playlist (bool): True if downloading elements as part of a playlist.
+            playlist_track_number (int, optional): The overridden track number in a playlist context.
+            booklet_only (bool): If True, downloads only the Digital Booklet and cover art, skipping audio.
+            playlist_as_albums (bool): If True, downloads playlist tracks into their original album folders.
+        """
         self.client = client
         self.item_id = item_id
         self.path = path
@@ -164,6 +219,12 @@ class Download:
         self._original_multiple_disc_track_format = settings.multiple_disc_track_format if settings else DEFAULT_MULTIPLE_DISC_TRACK
 
     def download_id_by_type(self, track=True):
+        """
+        Routes the download request based on the item type.
+
+        Args:
+            track (bool, optional): If True, processes as a single track. Defaults to True.
+        """
         self.folder_format = self._original_folder_format
         self.track_format = self._original_track_format
         if self.settings:
@@ -175,6 +236,15 @@ class Download:
             self.download_track()
 
     def download_release(self):
+        """
+        Handles the full download sequence for an album/release.
+        
+        Features:
+        - 3-Stage Fail-Safe Folders ([IN PROGRESS], [INCOMPLETE], clean name).
+        - Multithreaded track fetching via ThreadPoolExecutor.
+        - SIGINT hijacking to gracefully abort and release file locks.
+        - Skips geoblocked/unavailable tracks automatically without crashing.
+        """
         count = 0
         album_meta = self.client.get_album_meta(self.item_id)
 
@@ -396,6 +466,9 @@ class Download:
         safe_print(f"{GREEN}Completed{OFF}")
 
     def download_track(self):
+        """
+        Handles the download sequence for a standalone single track.
+        """
         parse = self.client.get_track_url(self.item_id, self.quality)
         if "sample" not in parse and parse["sampling_rate"]:
             track_meta = self.client.get_track_meta(self.item_id)
@@ -488,6 +561,26 @@ class Download:
         multiple=None,
         is_parallel=False
     ) -> bool:
+        """
+        Coordinates the actual downloading, fallback mechanisms, and metadata tagging.
+
+        Tries to download the requested quality; if blocked by the server or Akamai WAF, 
+        it automatically attempts to fetch lower tiers. Applies tagging and fetches lyrics upon success.
+
+        Args:
+            root_dir (str): Base destination directory for the track.
+            tmp_count (int): Temporary file counter.
+            track_url_dict (dict): Dictionary containing direct or segmented URLs.
+            track_metadata (dict): API metadata specific to the track.
+            album_or_track_metadata (dict): The higher-level metadata containing release info.
+            is_track (bool): Indicates if the context is a single track download.
+            is_mp3 (bool): If True, processes the file as MP3 ID3v2.
+            multiple (bool/int, optional): Indicates if part of a multi-disc set. Defaults to None.
+            is_parallel (bool, optional): Mutes individual progress bars if multithreading. Defaults to False.
+
+        Returns:
+            bool: True if download and tagging succeed, False otherwise (e.g. aborted).
+        """
         extension = ".mp3" if is_mp3 else ".flac"
 
         track_artist = _safe_get(track_metadata, "performer", "name")
@@ -653,7 +746,8 @@ class Download:
         return True
 
     @staticmethod
-    def _get_filename_attr(track_artist, track_metadata: dict, album_metadata: dict):     
+    def _get_filename_attr(track_artist, track_metadata: dict, album_metadata: dict): 
+        """Builds a dictionary of attributes to format the final filename."""    
         def _flatten_artists(artist_data):
             if isinstance(artist_data, list): return ", ".join(artist_data)
             return str(artist_data) if artist_data else ""
@@ -687,6 +781,7 @@ class Download:
 
     @staticmethod
     def _get_track_attr(meta, track_title, bit_depth, sampling_rate, file_format):
+        """Builds directory attributes when downloading a single track."""
         album_meta = meta.get("album", {})
         def _flatten_artists(artist_data):
             if isinstance(artist_data, list): return ", ".join(artist_data)
@@ -730,6 +825,7 @@ class Download:
 
     @staticmethod
     def _get_album_attr(meta, album_title, file_format, bit_depth, sampling_rate):
+        """Builds directory attributes when downloading an entire album/release."""
         def _flatten_artists(artist_data):
             if isinstance(artist_data, list): return ", ".join(artist_data)
             return str(artist_data) if artist_data else ""
@@ -768,6 +864,7 @@ class Download:
         }
 
     def _get_format(self, item_dict, is_track_id=False, track_url_dict=None):
+        """Checks stream restrictions and determines the actual obtainable audio format."""
         # Aggiungi questa protezione anti-crash SOLO per le release complete (Album/EP)
         if not is_track_id:
             if "tracks" not in item_dict or not item_dict["tracks"].get("items"):
@@ -808,6 +905,7 @@ class Download:
             return ("Unknown", quality_met, None, None)
 
     def _determine_formats(self, album_meta, album_attr, tracks_meta, track_attr, is_track, file_format, settings: QobuzDLSettings):
+        """Safely evaluates the user's config formats and falls back if tags are missing."""
         format_combinations = [
             (self._original_folder_format, self._original_track_format, self._original_multiple_disc_track_format),
             (settings.fallback_folder_format, self._original_track_format, self._original_multiple_disc_track_format),
@@ -866,6 +964,9 @@ class Download:
         self.track_format = DEFAULT_TRACK
 
     def _generate_tracklist(self, meta, dirn, album_title, file_format, bit_depth, sampling_rate):
+        """
+        Generates the Enhanced Digital Booklet (Tracklist.txt) with full credits and reviews.
+        """
         import re
         import textwrap
         
@@ -947,6 +1048,7 @@ class Download:
             safe_print(f"{RED}[!] Error creating booklet: {e}{OFF}")
 
     def _append_lyrics_to_booklet(self, dirn, album_title):
+        """Reads downloaded .lrc files, strips timecodes, and appends the raw text to the booklet."""
         import re
         if abort_event.is_set(): return
         
@@ -992,12 +1094,22 @@ class Download:
                 logger.error(f"{RED}[!] Error appending lyrics to booklet: {e}{OFF}")
 
 def _get_description(item: dict, track_title, multiple=None):
+    """Formats a logging string containing track info and bit depth."""
     downloading_title = f"{track_title} [{item.get('bit_depth', '')}/{item.get('sampling_rate', '')}]"
     if multiple:
         downloading_title = f"[CD {multiple}] {downloading_title}"
     return downloading_title
 
 def tqdm_download(url_or_callable, fname, track_name, is_parallel=False):
+    """
+    Standard HTTP downloader wrapped in a tqdm progress bar with retry logic.
+
+    Args:
+        url_or_callable (str|callable): Direct URL or a lambda to fetch it.
+        fname (str): Target file name.
+        track_name (str): Track display name for the UI logger.
+        is_parallel (bool, optional): Disables progress bars for clean multithreaded logging.
+    """
     if abort_event.is_set(): return
     G, Y, C, O = "\033[92m", "\033[93m", "\033[96m", "\033[0m"
 
@@ -1080,6 +1192,7 @@ def tqdm_download(url_or_callable, fname, track_name, is_parallel=False):
         raise Exception("Incomplete download")
 
 def _get_title(item_dict):
+    """Safely extracts and formats the track/album title."""
     item_title = item_dict.get("title")
     version = item_dict.get("version")
     if version:
@@ -1088,6 +1201,7 @@ def _get_title(item_dict):
 
 
 def _get_extra(item, dirn, extra="cover.jpg", art_size=None, og_quality=False):
+    """Downloads supplementary files (e.g., Cover Arts)."""
     if abort_event.is_set(): return
     extra_file = os.path.join(dirn, extra)
     if os.path.isfile(extra_file):
@@ -1104,6 +1218,7 @@ def _get_extra(item, dirn, extra="cover.jpg", art_size=None, og_quality=False):
         safe_print(f"  {YELLOW}[!] Skipping cover art '{extra}': URL unreachable ({e}){OFF}")
 
 def _clean_format_str(folder: str, track: str, file_format: str) -> Tuple[str, str]:
+    """Strips file extensions from format templates to prevent double-extensions."""
     final = []
     for i, fs in enumerate((folder, track)):
         if fs.endswith(".mp3"): fs = fs[:-4]
@@ -1114,6 +1229,7 @@ def _clean_format_str(folder: str, track: str, file_format: str) -> Tuple[str, s
     return tuple(final)
 
 def _safe_get(d: dict, *keys, default=None):
+    """Safely traverses nested dictionaries."""
     curr = d
     res = default
     for key in keys:
@@ -1125,6 +1241,19 @@ def _safe_get(d: dict, *keys, default=None):
     return res
 
 def tqdm_download_segments(track_url_dict, fname, track_name, is_parallel=False):
+    """
+    Downloads segmented tracks via the Web Player endpoint (WAF bypass).
+    
+    Uses multithreading to rapidly fetch stream chunks, decrypts them via AES-CTR 
+    using the Qobuz Session Key, and finally remuxes the segments into a gapless 
+    audio file using FFmpeg.
+
+    Args:
+        track_url_dict (dict): API payload containing 'url_template', 'n_segments', and 'raw_key'.
+        fname (str): Final target file path.
+        track_name (str): Track display name for the UI.
+        is_parallel (bool, optional): Disables progress bars for clean multithreaded logging.
+    """
     if abort_event.is_set(): return
     G, C, O = "\033[92m", "\033[96m", "\033[0m" 
     
@@ -1218,6 +1347,7 @@ def tqdm_download_segments(track_url_dict, fname, track_name, is_parallel=False)
 
 
 def _get_qobuz_segment_uuid(segment_data):
+    """Parses segment metadata to extract the UUID required for decryption."""
     pos = 0
     while pos + 24 <= len(segment_data):
         size = int.from_bytes(segment_data[pos : pos + 4], "big")
@@ -1230,6 +1360,17 @@ def _get_qobuz_segment_uuid(segment_data):
 
 
 def _decrypt_qobuz_segment(segment_data, raw_key, segment_uuid):
+    """
+    Performs AES-CTR decryption on a single downloaded file chunk.
+
+    Args:
+        segment_data (bytearray): The raw, encrypted downloaded chunk.
+        raw_key (bytes): The AES unwrapped track key.
+        segment_uuid (bytes): The chunk-specific UUID initialized for AES Counter (CTR).
+
+    Returns:
+        bytes: The fully decrypted audio chunk.
+    """
     if segment_uuid is None: return bytes(segment_data)
 
     buf = bytearray(segment_data)
@@ -1263,6 +1404,7 @@ def _decrypt_qobuz_segment(segment_data, raw_key, segment_uuid):
     return bytes(buf)
 
 def _download_goodies(album_meta, dirn):
+    """Downloads official digital PDF booklets provided by the Qobuz API."""
     if abort_event.is_set(): return
     try:
         for goody in album_meta.get("goodies", []):
@@ -1275,6 +1417,7 @@ def _download_goodies(album_meta, dirn):
 
 
 def _clean_embed_art(dirn, settings=None):
+    """Cleans up the temporary embed_cover.jpg file after tagging is complete."""
     embed_file = os.path.join(dirn, EMB_COVER_NAME)
     if os.path.exists(embed_file):
         try:

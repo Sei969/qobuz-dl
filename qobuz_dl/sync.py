@@ -10,8 +10,16 @@ logger = logging.getLogger(__name__)
 
 def sync_database(directory, db_path, client):
     """
-    Scans the local directory and restores missing Qobuz IDs into the local DB.
-    Uses embedded custom tags or falls back to Reverse Lookup via Qobuz API with anti-ban delay.
+    Executes the Smart Reverse Lookup operation.
+
+    Recursively scans the provided directory for audio files, extracts native QOBUZTRACKID 
+    and QOBUZALBUMID tags, and reconstructs the SQLite database to prevent future duplicate downloads.
+    If custom tags are missing, it falls back to querying the Qobuz API using the embedded ISRC code.
+
+    Args:
+        directory (str): The root directory containing the user's downloaded music library.
+        db_path (str): The local path to the target SQLite database file.
+        client (Client): The initialized Qobuz API client for fallback ISRC lookups.
     """
     logger.info(f"\n{YELLOW}[*] Starting Local Database Synchronization...{OFF}")
     logger.info(f"{YELLOW}[*] Scanning directory: {directory}{OFF}")

@@ -10,8 +10,23 @@ try:
 except ImportError:
     lyricsgenius = None
 
+
 class LyricsEngine:
+    """
+    Roon-Ready Synchronized Lyrics Engine.
+    
+    Responsible for fetching synchronized (LRC) or plain text lyrics from LRCLIB 
+    and falling back to Genius API if configured. It handles both saving external 
+    .lrc/.txt files and natively embedding the lyrics into audio metadata.
+    """
+
     def __init__(self, genius_token=None):
+        """
+        Initializes the Lyrics Engine and conditionally loads the Genius API client.
+
+        Args:
+            genius_token (str, optional): The user's Genius API token. Defaults to None.
+        """
         self.genius_token = genius_token
         self.genius = None
         if self.genius_token and lyricsgenius:
@@ -19,7 +34,21 @@ class LyricsEngine:
             self.genius.verbose = False
 
     def fetch_and_inject(self, file_path, artist, track, album, save_lrc=True, embed_lyrics=True):
-        """Waterfall engine: first try LRCLIB (for LRC format), then Genius."""
+        """
+        Waterfall engine: first try LRCLIB (for LRC format), then Genius.
+        
+        Attempts to fetch lyrics for the given track. If synchronized lyrics are found, 
+        they can be saved as a separate .lrc file and/or embedded into the audio file's tags 
+        for native Karaoke support in Roon and advanced DAPs.
+
+        Args:
+            file_path (str): The absolute path to the audio file.
+            artist (str): The name of the main artist.
+            track (str): The track title.
+            album (str): The album title.
+            save_lrc (bool, optional): If True, saves an external .lrc or .txt file next to the audio. Defaults to True.
+            embed_lyrics (bool, optional): If True, injects the lyrics into the audio file's metadata. Defaults to True.
+        """
         
         if not save_lrc and not embed_lyrics:
             return
@@ -92,14 +121,26 @@ class LyricsEngine:
             print(f"    ⚠️ Error during lyrics search: {e}")
 
     def _save_lrc_file(self, audio_file_path, synced_lyrics):
-        """Creates the .lrc file next to the audio file."""
+        """
+        Creates the .lrc or .txt file next to the audio file.
+
+        Args:
+            audio_file_path (str): The absolute path to the downloaded audio file.
+            synced_lyrics (str): The lyrics string to be saved.
+        """
         base_name = os.path.splitext(audio_file_path)[0]
         lrc_path = f"{base_name}.lrc"
         with open(lrc_path, 'w', encoding='utf-8') as f:
             f.write(synced_lyrics)
 
     def _inject_metadata(self, file_path, lyrics):
-        """Injects lyrics directly into FLAC or MP3 tags."""
+        """
+        Injects lyrics directly into FLAC (LYRICS block) or MP3 (USLT frame) tags.
+
+        Args:
+            file_path (str): The absolute path to the downloaded audio file.
+            lyrics (str): The fetched lyrics string.
+        """
         if not lyrics: return
         
         ext = os.path.splitext(file_path)[1].lower()

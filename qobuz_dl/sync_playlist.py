@@ -8,6 +8,17 @@ from qobuz_dl.color import CYAN, GREEN, RED, YELLOW, OFF
 logger = logging.getLogger(__name__)
 
 def _scan_local_tracks(directory):
+    """
+    Scans a local directory recursively to map existing audio files using their embedded Qobuz IDs.
+
+    Args:
+        directory (str): The local directory path to scan.
+
+    Returns:
+        tuple: A tuple containing:
+            - dict: A mapping of extracted Qobuz track IDs to their local file paths.
+            - list: A list of paths for files that lack a valid Qobuz track ID tag.
+    """
     local_tracks = {}
     untagged_files = []
 
@@ -40,6 +51,18 @@ def _scan_local_tracks(directory):
     return local_tracks, untagged_files
 
 def _fetch_remote_tracks(client, playlist_id):
+    """
+    Retrieves the complete tracklist and metadata of a playlist from the Qobuz API.
+
+    Args:
+        client (Client): The initialized Qobuz API client.
+        playlist_id (str): The unique identifier of the target playlist.
+
+    Returns:
+        tuple: A tuple containing:
+            - str: The resolved playlist name.
+            - list: A list of dictionaries containing metadata for each track.
+    """
     all_items = []
     playlist_name = "Unknown Playlist"
     for chunk in client.get_plist_meta(playlist_id):
@@ -50,12 +73,28 @@ def _fetch_remote_tracks(client, playlist_id):
     return playlist_name, all_items
 
 def _sanitize_dirname(name):
+    """
+    Removes illegal characters to create safe directory names across different operating systems.
+
+    Args:
+        name (str): The original directory string.
+
+    Returns:
+        str: The sanitized directory string.
+    """
     invalid_chars = '<>:"/\\|?*'
     for char in invalid_chars:
         name = name.replace(char, '_')
     return name.strip()
 
 def _clean_empty_dirs(base_directory, exclude_dirs=None):
+    """
+    Recursively deletes empty subdirectories left behind after syncing tracks.
+
+    Args:
+        base_directory (str): The root directory to evaluate.
+        exclude_dirs (set, optional): A set of directory names to protect from deletion. Defaults to None.
+    """
     exclude = set(exclude_dirs or [])
     exclude.add("_Playlists")
 
@@ -73,6 +112,19 @@ def _clean_empty_dirs(base_directory, exclude_dirs=None):
                 pass
 
 def sync_playlist(qobuz_dl, url, folder, auto_confirm=False):
+    """
+    The main Bidirectional Playlist Synchronization engine.
+
+    Mirrors a Qobuz playlist locally by identifying missing tracks (to be downloaded) 
+    and orphan tracks (to be physically deleted, along with associated .lrc files). 
+    Maintains a "Flat Folder" architecture and automatically updates the .m3u playlist file.
+
+    Args:
+        qobuz_dl (QobuzDL): The core application instance.
+        url (str): The valid Qobuz playlist URL.
+        folder (str): The base target directory on the local system.
+        auto_confirm (bool, optional): If True, bypasses the interactive confirmation prompt. Defaults to False.
+    """
     from qobuz_dl.utils import get_url_info, make_m3u
 
     try:

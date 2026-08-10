@@ -23,7 +23,17 @@ from qobuz_dl.settings import QobuzDLSettings
 
 # --- UI TABLE FORMATTING HELPER ---
 def _align_text(text, width):
-    """Truncates text with '...' if too long, or pads with spaces if too short."""
+    """
+    Truncates text with '...' if it exceeds the specified width, 
+    or pads it with spaces to ensure perfect UI table alignment.
+
+    Args:
+        text (str): The text to format.
+        width (int): The maximum character width.
+
+    Returns:
+        str: The aligned and formatted string.
+    """
     text = str(text)
     if len(text) > width:
         return text[:width - 3] + "..."
@@ -44,6 +54,13 @@ logger = logging.getLogger(__name__)
 
 
 class QobuzDL:
+    """
+    The main orchestrator class for Qobuz-DL Ultimate Edition.
+    
+    Ties together the API Client, Downloader, UI routing, and advanced automations 
+    such as Stateful Batch Downloading, Anti-Spam Blacklisting, and Interactive UI menus.
+    """
+
     def __init__(
         self,
         directory="QobuzDownloads",
@@ -72,6 +89,35 @@ class QobuzDL:
         blacklist=None,
         playlist_as_albums: bool = False,
     ):
+        """
+        Initializes the Core application and parses settings.
+
+        Args:
+            directory (str): Base output directory. Defaults to "QobuzDownloads".
+            quality (int): Target audio format ID. Defaults to 6.
+            embed_art (bool): Enables embedded album art. Defaults to False.
+            lucky_limit (int): Number of items to fetch in lucky mode. Defaults to 1.
+            lucky_type (str): The entity type for lucky mode searches. Defaults to "album".
+            interactive_limit (int): Max results displayed in the CLI menu. Defaults to 20.
+            ignore_singles_eps (bool): Skips non-album releases. Defaults to False.
+            no_m3u_for_playlists (bool): Disables .m3u playlist generation. Defaults to False.
+            quality_fallback (bool): Automatically downgrades quality if target is unavailable. Defaults to True.
+            cover_og_quality (bool): Fetches original uncompressed cover art. Defaults to False.
+            no_cover (bool): Completely skips cover art downloading. Defaults to False.
+            downloads_db (str): Path to the SQLite DB for Smart Reverse Lookup. Defaults to None.
+            folder_format (str): Directory naming template.
+            track_format (str): File naming template.
+            smart_discography (bool): Enables Smart Discography filtering. Defaults to False.
+            fetch_lyrics (bool): Enables Roon-Ready Synchronized Lyrics. Defaults to False.
+            no_lrc_files (bool): Disables external .lrc generation. Defaults to False.
+            genius_token (str): API Token for Genius fallback lyrics. Defaults to None.
+            force_english (bool): Enforces en_US locales to bypass WAF bans. Defaults to True.
+            no_credits (bool): Disables Digital Booklet generation. Defaults to False.
+            settings (QobuzDLSettings): Configuration object mapping config.ini variables.
+            booklet_only (bool): Downloads only metadata and artwork, skipping audio. Defaults to False.
+            blacklist (str): Path to the .txt file for the Anti-Spam Blacklist Engine. Defaults to None.
+            playlist_as_albums (bool): Downloads playlist tracks into their respective album folders. Defaults to False.
+        """
         self.directory = create_and_return_dir(directory)
         self.quality = quality
         self.embed_art = embed_art
@@ -106,10 +152,12 @@ class QobuzDL:
                 logger.error(f"{RED}[!] Failed to load blacklist: {e}{OFF}")
         
     def initialize_client(self, email, pwd, app_id, secrets):
+        """Authenticates the session and initializes the Stealth Spoofing client."""
         self.client = qopy.Client(email, pwd, app_id, secrets, self.settings.user_auth_token, force_english=self.force_english)
         logger.info(f"{YELLOW}Set max quality: {QUALITIES[int(self.quality)]}\n")
 
     def get_tokens(self):
+        """Fetches dynamic Application IDs and Secrets from the internal bundle."""
         bundle = Bundle()
         self.app_id = bundle.get_app_id()
         self.secrets = [
@@ -117,6 +165,10 @@ class QobuzDL:
         ]  
 
     def download_from_id(self, item_id, album=True, alt_path=None, is_playlist=False, playlist_index=None):
+        """
+        Routes the item ID to the Downloader Engine, checking the SQLite database 
+        first to prevent duplicates (Smart Reverse Lookup).
+        """
         if handle_download_id(self.downloads_db, item_id, add_id=False, quality=self.quality):
             logger.info(
                 f"{OFF}This release ID ({item_id}) was already downloaded "
@@ -158,6 +210,11 @@ class QobuzDL:
             time.sleep(self.delay)
 
     def handle_url(self, url):
+        """
+        Parses raw Qobuz URLs, resolving their type (Playlist, Artist, Album, Track) 
+        and forwarding the respective IDs to the download engine. 
+        Implements the Heuristic Engine for artist discographies and Flat Folder logic for playlists.
+        """
         possibles = {
             "playlist": {
                 "func": self.client.get_plist_meta,
@@ -348,7 +405,14 @@ class QobuzDL:
 
     # --- SMART RESUME / BATCH DOWNLOADER LOGIC ---
     def mark_url_done_in_file(self, txt_file, url_to_mark):
-        """Appends a [DONE] tag next to a processed URL in the text file."""
+        """
+        Appends a [DONE] tag next to a processed URL in a text file.
+        Enables the Stateful Batch Downloading feature.
+
+        Args:
+            txt_file (str): Path to the text file containing URLs.
+            url_to_mark (str): The specific URL string to mark as completed.
+        """
         if not txt_file or not os.path.isfile(txt_file):
             return
         try:
@@ -366,6 +430,7 @@ class QobuzDL:
             logger.error(f"{RED}Failed to update text file status: {e}{OFF}")
 
     def download_list_of_urls(self, urls, txt_file=None):
+        """Processes a raw list of URLs, routing Qobuz and Last.fm links accordingly."""
         if not urls or not isinstance(urls, list):
             logger.info(f"{OFF}Nothing to download")
             return
@@ -384,6 +449,10 @@ class QobuzDL:
                 self.mark_url_done_in_file(txt_file, original_url)
 
     def download_from_txt_file(self, txt_file):
+        """
+        Ingests a text file containing Qobuz URLs, filtering out completed items, 
+        comments, and invalid lines, before pushing them to the batch engine.
+        """
         try:
             valid_urls = []
             with open(txt_file, "r", encoding="utf-8") as txt:
@@ -420,6 +489,7 @@ class QobuzDL:
     # ---------------------------------------------
 
     def lucky_mode(self, query, download=True):
+        """Automatically fetches and downloads the top result for a given query."""
         if len(query) < 3:
             logger.info(f"{RED}Your search query is too short or invalid")
             return
@@ -437,6 +507,17 @@ class QobuzDL:
         return results
 
     def search_by_type(self, query, item_type, limit=10, lucky=False, fav_subtype=None):
+        """
+        Routes text queries to the Qobuz API. Supports native search for Albums, 
+        Artists, Tracks, Playlists, and the authenticated user's private Favorites.
+
+        Args:
+            query (str): The search keyword.
+            item_type (str): Category (e.g., 'album', 'favorites').
+            limit (int): Max results to retrieve.
+            lucky (bool): If True, returns only URLs. If False, returns formatted dicts.
+            fav_subtype (str, optional): Required if item_type is 'favorites'.
+        """
         # Prevent crash if query is None (which happens when searching favorites)
         if item_type != "favorites" and (not query or len(query) < 3):
             logger.info(f"{RED}Your search query is too short or invalid")
@@ -559,6 +640,13 @@ class QobuzDL:
             return
 
     def interactive(self, download=True):
+        """
+        Launches the Native Interactive Menu in the terminal.
+        
+        Features a graphical multi-select interface (via the 'pick' library) to browse 
+        the Qobuz catalog or the user's private Favorites, queueing up batches of URLs 
+        for downloading.
+        """
         # --- NEW: Flag to let the engine know we are in a TTY session ---
         self._is_interactive_session = True
         # ----------------------------------------------------------------
@@ -684,6 +772,10 @@ class QobuzDL:
             return
 
     def download_lastfm_pl(self, playlist_url):
+        """
+        Parses an external Last.fm playlist, queries the Qobuz database via Fuzzy Matching, 
+        and initiates a batch download of all matched tracks.
+        """
         from qobuz_dl.lastfm_parser import fetch_lastfm_playlist
         
         logger.info(f"{CYAN}[*] Last.fm URL detected! Initiating Last.fm integration...{OFF}")
