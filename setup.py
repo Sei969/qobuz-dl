@@ -13,7 +13,7 @@ def get_version():
                     return line.split('"')[1]
     except Exception:
         pass
-    return "2.3.4"
+    return "2.3.5"
 
 def read_file(fname):
     # Added encoding="utf-8" to prevent build errors with emojis in README
@@ -45,6 +45,13 @@ setup(
     long_description_content_type="text/markdown",
     # 4. LINK TO YOUR FORK
     url="https://github.com/Sei969/qobuz-dl", 
+    
+    project_urls={
+        "Documentation": "https://github.com/Sei969/qobuz-dl/wiki",
+        "Source Code": "https://github.com/Sei969/qobuz-dl",
+        "Bug Tracker": "https://github.com/Sei969/qobuz-dl/issues",
+    },
+    
     install_requires=requirements,
     entry_points={
         "console_scripts": [
