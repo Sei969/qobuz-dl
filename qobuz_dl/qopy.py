@@ -52,16 +52,19 @@ class Client:
         self.secrets = secrets
         self.force_english = force_english
         
-        if Bundle:
-            try:
-                b = Bundle()
-                fresh_id = str(b.get_app_id())
-                if fresh_id:
-                    self.id = fresh_id
-                    self.secrets = list(b.get_secrets().values())
-                    logger.info(f"{GREEN}[+] App ID dynamically updated: {self.id}{OFF}")
-            except Exception:
-                pass
+        if not self.id or self.id == "798273057":
+            if Bundle:
+                try:
+                    b = Bundle()
+                    fresh_id = str(b.get_app_id())
+                    if fresh_id:
+                        self.id = fresh_id
+                        self.secrets = list(b.get_secrets().values())
+                        logger.info(f"{GREEN}[+] App ID dynamically updated: {self.id}{OFF}")
+                except Exception:
+                    pass
+        else:
+            logger.info(f"{GREEN}[+] Using custom legacy App ID: {self.id}{OFF}")
 
         self.session = requests.Session()
         
