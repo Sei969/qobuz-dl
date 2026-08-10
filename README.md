@@ -395,6 +395,13 @@ When running `python -m qobuz_dl -r`, the configuration wizard will now ask:
 `"Disable OS Keyring and save tokens in config.ini?"` 
 Select **`yes`** if you are on a server or NAS environment. This will bypass the system keyring and ensure your tokens are persisted in the `config.ini` file, guaranteeing 100% stable authentication
 
+## 👨‍💻 For Developers: Using Qobuz-DL as a Python Library
+
+Are you building your own music automation scripts, Telegram bots, or Discord integrations? 
+You can import our core engines (AES-Segmented Downloader, Audiophile Tagger, and WAF-Bypass Client) directly into your own Python projects!
+
+📚 **[Read the Official Developer API Guide in our Wiki](https://github.com/Sei969/qobuz-dl/wiki/Developer-Guide-(Python-API))**
+
 ## 🏆 Credits
 * **[vitiko98](https://github.com/vitiko98/qobuz-dl)**: Creator of the original project.
 * **[xwell](https://github.com/xwell/qobuz-dl)**: For the massive tag refactoring and "Goodies" integration.
