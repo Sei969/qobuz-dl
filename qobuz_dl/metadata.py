@@ -54,31 +54,32 @@ LOCAL_GENRE_MAP = {
     "Électronique": "Electronic",
     "Ambiance": "Ambient",
     
-    # Classica & Strumentale
+    # Classical
     "Classique": "Classical",
     "Musique de chambre": "Chamber Music",
     "Opéra": "Opera",
     "Chorale": "Choral",
     "Symphonique": "Symphonic",
     
-    # Colonne Sonore & Media
+    # Soundtracks & Media
     "Bande Originale": "Soundtrack",
     "Musique de film": "Soundtrack",
     "Comédie Musicale": "Musical",
     "Bande originale de jeu vidéo": "Video Game Soundtrack",
+    "Séries TV": "TV Series",
     
     # Jazz & Blues
     "Jazz Vocal": "Vocal Jazz",
     "Jazz Contemporain": "Contemporary Jazz",
     
-    # World Music & Regionali
+    # World Music
     "Musiques du monde": "World",
     "Musique celtique": "Celtic",
     "Musique latine": "Latin",
     "Variété Française": "French Pop",
     "Alternatif et Indé": "Alternative & Indie",
         
-    # Varie
+    # Others
     "Enfants": "Children's Music",
     "Berceuses": "Lullabies",
     "Poésie et Littérature": "Spoken Word",

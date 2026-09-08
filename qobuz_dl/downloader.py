@@ -730,6 +730,8 @@ class Download:
                     artist=search_artist, 
                     track=track_title, 
                     album=search_album,
+                    track_id=track_metadata.get("id"),
+                    qobuz_client=self.client,
                     save_lrc=not self.no_lrc_files,
                     embed_lyrics=getattr(self.settings, 'embed_lyrics', True),
                     is_parallel=is_parallel

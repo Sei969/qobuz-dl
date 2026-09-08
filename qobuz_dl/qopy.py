@@ -284,16 +284,14 @@ class Client:
             params["request_sig"] = self._modern_sig(
                 epoint, params, kwargs.get("sec", self.sec)
             )
-        elif epoint == "file/url":
-            track_id = kwargs["id"]
-            fmt_id = kwargs["fmt_id"]
-            if int(fmt_id) not in (6, 7, 27):
-                raise InvalidQuality("Invalid quality id: choose between 6, 7 or 27")
+        elif epoint == "track/lyricsUrl":
             params = {
-                "track_id": track_id,
-                "format_id": fmt_id,
-                "intent": "import",
+                "track_id": kwargs.get("track_id") or kwargs.get("id"),
             }
+            # Qobuz API v10 optional language parameter for translations
+            if "language" in kwargs:
+                params["language"] = kwargs["language"]
+                
             params["request_ts"] = int(time.time())
             params["request_sig"] = self._modern_sig(
                 epoint, params, kwargs.get("sec", self.sec)
