@@ -2,6 +2,7 @@ import logging
 import os
 import sys
 import time
+import re
 
 import requests
 from pathvalidate import sanitize_filename
@@ -379,8 +380,17 @@ class QobuzDL:
                     version_tag = item.get("version") or ""
                     
                     display_name = f"{base_title} ({version_tag})" if version_tag else base_title
+                    display_lower = display_name.lower()
                     
-                    if any(pattern in display_name.lower() for pattern in self.blacklist_patterns):
+                    is_blacklisted = False
+                    for pattern in self.blacklist_patterns:
+                        regex_pattern = rf"(?<!\w){re.escape(pattern)}(?!\w)"
+                        
+                        if re.search(regex_pattern, display_lower):
+                            is_blacklisted = True
+                            break
+                            
+                    if is_blacklisted:
                         logger.info(f"{YELLOW}[!] Skipped (Blacklisted): {display_name}{OFF}")
                         continue
 
