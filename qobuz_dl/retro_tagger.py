@@ -10,20 +10,21 @@ from qobuz_dl.color import CYAN, GREEN, YELLOW, RED, OFF
 
 logger = logging.getLogger(__name__)
 
-def inject_lyrics_retroactively(directory_path, genius_token=None, settings=None):
+def inject_lyrics_retroactively(directory_path, genius_token=None, settings=None, client=None):
     """
     Retroactively scans a local audio library to inject missing synchronized lyrics.
 
     Iterates through all FLAC and MP3 files in the specified directory. If a file 
     lacks existing lyrics but contains basic metadata (Title, Artist, Album), it 
     invokes the Roon-Ready Lyrics Engine to fetch and embed the lyrics without 
-    redownloading the track.
+    redownloading the track. Now supports reading QOBUZTRACKID to fetch native 
+    1:1 Qobuz lyrics if an authenticated client is provided.
 
     Args:
         directory_path (str): The absolute path to the local music directory to be scanned.
         genius_token (str, optional): The Genius API token for fallback lyric searches. Defaults to None.
-        settings (QobuzDLSettings, optional): Configuration object to dictate embedding 
-            and file saving preferences (e.g., --no-lrc-files). Defaults to None.
+        settings (QobuzDLSettings, optional): Configuration object to dictate embedding preferences.
+        client (Client, optional): Authenticated Qobuz API client for native lyric fetching.
     """
     if settings is None:
         settings = QobuzDLSettings()
@@ -46,7 +47,7 @@ def inject_lyrics_retroactively(directory_path, genius_token=None, settings=None
                 processed += 1
                 
                 try:
-                    title, artist, album = "", "", ""
+                    title, artist, album, track_id = "", "", "", None
                     needs_lyrics = False
 
                     # --- FLAC HANDLING ---
@@ -62,6 +63,9 @@ def inject_lyrics_retroactively(directory_path, genius_token=None, settings=None
                         performer_name = audio.get("ARTIST", ["Unknown Artist"])[0]
                         artist = performer_name if album_artist in ["", "Various Artists"] else album_artist
                         album = audio.get("ALBUM", [""])[0]
+                        
+                        # Extract native Qobuz Track ID if present
+                        track_id = audio.get("QOBUZTRACKID", [None])[0]
                         needs_lyrics = True
                         
                     # --- MP3 HANDLING ---
@@ -80,6 +84,13 @@ def inject_lyrics_retroactively(directory_path, genius_token=None, settings=None
                         title = audio.get("TIT2").text[0] if audio.get("TIT2") else ""
                         artist = audio.get("TPE1").text[0] if audio.get("TPE1") else ""
                         album = audio.get("TALB").text[0] if audio.get("TALB") else ""
+                        
+                        # Extract native Qobuz Track ID from TXXX frame
+                        for txxx in audio.getall("TXXX"):
+                            if txxx.desc == "QOBUZTRACKID":
+                                track_id = txxx.text[0]
+                                break
+                                
                         needs_lyrics = True
 
                     # Skip if file is corrupted or lacks basic tags
@@ -91,14 +102,16 @@ def inject_lyrics_retroactively(directory_path, genius_token=None, settings=None
                     if needs_lyrics:
                         print(f"{YELLOW}  > Missing lyrics: {artist} - {title}. Searching...{OFF}")
                         
-                        # Call the LyricsEngine mapping user preferences
+                        # Call the LyricsEngine mapping user preferences and API credentials
                         engine.fetch_and_inject(
                             file_path=file_path,
                             artist=artist,
                             track=title,
                             album=album,
                             save_lrc=getattr(settings, 'lrc_files', True),
-                            embed_lyrics=getattr(settings, 'embed_lyrics', True)
+                            embed_lyrics=getattr(settings, 'embed_lyrics', True),
+                            track_id=track_id,
+                            qobuz_client=client
                         )
                         injected += 1
                             

@@ -310,7 +310,7 @@ The Ultimate Edition includes powerful local library managers to keep track of y
   ```
 
 * **Retroactive Lyrics Tagger (`lyrics`):**
-  Do you have an existing local music library that lacks synced lyrics? The new `lyrics` command acts as a standalone metadata engine. It recursively scans any local directory, detects FLAC/MP3 files missing lyrics, and intelligently injects them into the audio files using LRCLIB (and Genius API) without re-downloading any music.
+  Do you have an existing local music library that lacks synced lyrics? The `lyrics` command acts as a standalone metadata engine. It recursively scans any local directory and detects FLAC/MP3 files missing lyrics. It intelligently reads the hidden `QOBUZTRACKID` tags from your existing files to retroactively fetch and inject the **official native 1:1 Qobuz lyrics**. For files originating from other sources (e.g., CD rips), it gracefully falls back to LRCLIB and Genius APIs using the Fuzzy Matching algorithm, all without re-downloading any audio.
   ```bash
   python -m qobuz_dl lyrics "/path/to/your/local/music/folder"
   ```

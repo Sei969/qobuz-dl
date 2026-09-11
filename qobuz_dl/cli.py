@@ -541,6 +541,7 @@ def main():
     # --- RETRO LYRICS FEATURE (Standalone Mode) ---
     if arguments.command == "lyrics":
         from qobuz_dl.retro_tagger import inject_lyrics_retroactively
+        from qobuz_dl.qopy import Client
         
         target_dir = arguments.DIR
         if os.name == "nt":
@@ -551,9 +552,13 @@ def main():
         lrc_pref = not config.getboolean(section, "no_lrc_files", fallback=False)
         embed_pref = config.getboolean(section, "embed_lyrics", fallback=True)
         local_settings = QobuzDLSettings(lrc_files=lrc_pref, embed_lyrics=embed_pref)
+        
+        # Initialize an authenticated API client to fetch native Qobuz lyrics
+        print(f"\n\033[96m[*] Initializing Qobuz API Client for native lyrics fetch...\033[0m")
+        lyrics_client = Client(email, password, app_id, secrets, user_auth_token=token, force_english=force_english)
                 
         try:
-            inject_lyrics_retroactively(target_dir, genius_token=genius_token, settings=local_settings)
+            inject_lyrics_retroactively(target_dir, genius_token=genius_token, settings=local_settings, client=lyrics_client)
         except KeyboardInterrupt:
             print("\n\n\033[91m[!] Operation manually interrupted by the user (CTRL+C).\033[0m")
             print("\033[93mAlready processed files are safe. Exiting...\033[0m")
