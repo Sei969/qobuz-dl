@@ -13,7 +13,7 @@ def get_version():
                     return line.split('"')[1]
     except Exception:
         pass
-    return "2.4.1"
+    return "2.4.2"
 
 def read_file(fname):
     # Added encoding="utf-8" to prevent build errors with emojis in README

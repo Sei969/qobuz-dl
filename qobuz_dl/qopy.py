@@ -131,35 +131,49 @@ class Client:
     def auth(self, email, pwd, user_auth_token=None):
         """
         Authenticates the user session with Qobuz and retrieves account metadata.
+        Strict Token-Only Architecture: The legacy 'user/login' endpoint is bypassed.
 
         Args:
-            email (str): The user's email address.
-            pwd (str): The user's password.
+            email (str): The user's email address (kept for config parser compatibility).
+            pwd (str): The user's password (can act as a fallback for the token).
             user_auth_token (str, optional): Direct token to bypass credential check. Defaults to None.
         """
-        # If the token is present, skip the password!
+        import sys
+        
+        # 1. Retrieve the token from native parameters or the password fallback
         if user_auth_token:
             self.uat = user_auth_token
         elif len(pwd) > 60:
             self.uat = pwd
         else:
-            usr_info = self.api_call("user/login", email=email, pwd=pwd)
-            if not usr_info.get("user", {}).get("credential", {}).get("parameters"):
-                logger.info(f"{YELLOW}[!] Free account detected or validation bypassed.{OFF}")
-            self.uat = usr_info["user_auth_token"]
+            # 2. No legacy API login attempts.
+            print(f"\n{RED}[!] Authentication Error: Auth Token missing or not configured.{OFF}")
+            print(f"{YELLOW}[*] Qobuz has permanently blocked login via email and password.{OFF}")
+            print(f"{YELLOW}[*] Run the 'qobuz-dl -r' (or '--reset') command to launch the wizard and securely save your Token.{OFF}\n")
+            sys.exit(1)
         
         self.session.headers.update({"X-User-Auth-Token": self.uat})
         
         try:
+            # 3. Token validation via a secure user profile request
             user_info = self.api_call("user/get")
             cred = user_info.get("credential") or user_info.get("user", {}).get("credential", {})
             self.label = cred.get("parameters", {}).get("short_label", "Studio")
             
-            # --- FIX: Save user ID strictly required for favorites ---
+            # Save the user ID strictly required for favorites synchronization
             self.user_id = user_info.get("id") or user_info.get("user", {}).get("id")
-            # -------------------------------------------------------------------------
             
             logger.info(f"{GREEN}Logged: OK (Membership: {self.label}){OFF}")
+            
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 401:
+                print(f"\n{RED}[!] 401 Unauthorized: Your Auth Token is expired or invalid.{OFF}")
+                print(f"{YELLOW}[*] Run 'qobuz-dl -r' to enter a new Token retrieved from your browser.{OFF}\n")
+                sys.exit(1)
+            else:
+                logger.info(f"{YELLOW}[!] Profile validation bypassed ({e}).{OFF}")
+                self.label = "Studio"
+                self.user_id = None
         except Exception:
             logger.info(f"{YELLOW}[!] Profile validation bypassed.{OFF}")
             self.label = "Studio"
