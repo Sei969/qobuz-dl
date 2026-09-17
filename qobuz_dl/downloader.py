@@ -64,7 +64,7 @@ def format_release_type(release_type: str) -> str:
     return release_type.title()
 # --------------------------------------------------------
 
-def process_folder_format_with_subdirs(folder_format, attr_dict, path=None, legacy_charmap=False):
+def process_folder_format_with_subdirs(folder_format, attr_dict, path=None, legacy_charmap=False, disable_truncation=False):
     """
     Parses and sanitizes the user's custom folder format string, generating a safe directory path.
 
@@ -73,6 +73,7 @@ def process_folder_format_with_subdirs(folder_format, attr_dict, path=None, lega
         attr_dict (dict): The dictionary containing metadata attributes to format the string.
         path (str, optional): The base destination path. Defaults to None.
         legacy_charmap (bool, optional): If True, applies legacy character mapping. Defaults to False.
+        disable_truncation (bool, optional): If True, bypasses smart truncation for long paths. Defaults to False.
 
     Returns:
         str: The fully resolved and sanitized local directory path.
@@ -83,11 +84,11 @@ def process_folder_format_with_subdirs(folder_format, attr_dict, path=None, lega
         if part:
             try:
                 formatted_part = part.format(**attr_dict)
-                # AGGIUNTO legacy_charmap QUI:
+                # Apply legacy_charmap support to formatted parts
                 cleaned_part = sanitize_filepath(clean_filename(formatted_part, legacy_charmap=legacy_charmap), replacement_text="_")
                 
                 # --- FIX: SMART TRUNCATION FOR ALBUM FOLDER ---
-                if cleaned_part and len(cleaned_part) > 120:
+                if not disable_truncation and cleaned_part and len(cleaned_part) > 120:
                     start_f = cleaned_part[:60].rstrip(' ."-_\'')
                     end_f = cleaned_part[-50:].lstrip(' ."-_\'')
                     cleaned_part = f"{start_f}...{end_f}"
@@ -96,10 +97,10 @@ def process_folder_format_with_subdirs(folder_format, attr_dict, path=None, lega
                     cleaned_parts.append(cleaned_part)
             except KeyError as e:
                 logger.warning(f"{YELLOW}Format error ({e}), using original text.{OFF}")
-                # AGGIUNTO legacy_charmap ANCHE QUI:
+                # Apply legacy_charmap fallback
                 cleaned_part = sanitize_filepath(clean_filename(part, legacy_charmap=legacy_charmap), replacement_text="_")
                 
-                if cleaned_part and len(cleaned_part) > 120:
+                if not disable_truncation and cleaned_part and len(cleaned_part) > 120:
                     start_f = cleaned_part[:60].rstrip(' ."-_\'')
                     end_f = cleaned_part[-50:].lstrip(' ."-_\'')
                     cleaned_part = f"{start_f}...{end_f}"
@@ -281,8 +282,11 @@ class Download:
         self._determine_formats(album_meta=album_meta, album_attr=album_attr, tracks_meta=album_meta["tracks"]["items"],
                                 track_attr=None, is_track=False, file_format=file_format, settings=self.settings)
         
+        # Retrieve legacy charmap and smart truncation flags from settings
         legacy_flag = getattr(self.settings, 'legacy_charmap', False) if hasattr(self, 'settings') else False
-        target_dirn = process_folder_format_with_subdirs(self.folder_format, album_attr, self.path, legacy_charmap=legacy_flag)
+        disable_trunc_flag = getattr(self.settings, 'disable_smart_truncation', False) if hasattr(self, 'settings') else False
+        
+        target_dirn = process_folder_format_with_subdirs(self.folder_format, album_attr, self.path, legacy_charmap=legacy_flag, disable_truncation=disable_trunc_flag)
         base_path, folder_name = os.path.split(target_dirn)
         
         incomplete_dirn = os.path.join(base_path, f"[INCOMPLETE] {folder_name}")
@@ -497,8 +501,11 @@ class Download:
             self._determine_formats(album_meta=track_meta.get("album", {}), album_attr=None, tracks_meta=[track_meta],
                                     track_attr=track_attr, is_track=True, file_format=file_format, settings=self.settings)
             
+            # Retrieve legacy charmap and smart truncation flags from settings
             legacy_flag = getattr(self.settings, 'legacy_charmap', False) if hasattr(self, 'settings') else False
-            dirn = process_folder_format_with_subdirs(self.folder_format, track_attr, self.path, legacy_charmap=legacy_flag)
+            disable_trunc_flag = getattr(self.settings, 'disable_smart_truncation', False) if hasattr(self, 'settings') else False
+            
+            dirn = process_folder_format_with_subdirs(self.folder_format, track_attr, self.path, legacy_charmap=legacy_flag, disable_truncation=disable_trunc_flag)
             os.makedirs(dirn, exist_ok=True)
 
             if getattr(self, 'is_playlist', False) and not getattr(self, 'playlist_as_albums', False):
@@ -612,8 +619,10 @@ class Download:
                 formatted_path = base_formatted
         # -----------------------------------------------------------
             
+        # Smart Truncation bypass for file paths based on config settings
+        disable_trunc_flag = getattr(self.settings, 'disable_smart_truncation', False) if hasattr(self, 'settings') else False
         max_len = 180
-        if len(formatted_path) > max_len:
+        if not disable_trunc_flag and len(formatted_path) > max_len:
             start_part = formatted_path[:110].rstrip(' ."-_\'')
             end_part = formatted_path[-60:].lstrip(' ."-_\'')
             formatted_path = f"{start_part}...{end_part}"
@@ -920,8 +929,9 @@ class Download:
         is_multiple = True if media_count > 1 else False
         extension = ".flac" if file_format.lower() == "flac" else ".mp3"
         
-        # --- NEW: Retrieve legacy charmap flag ---
+        # Retrieve legacy charmap and smart truncation flags to safely format directories
         legacy_flag = getattr(settings, 'legacy_charmap', False) if settings else False
+        disable_trunc_flag = getattr(settings, 'disable_smart_truncation', False) if settings else False
 
         for folder_fmt, track_fmt, multi_disc_fmt in format_combinations:
             folder_fmt, track_fmt = _clean_format_str(folder_fmt, track_fmt, file_format)
@@ -929,9 +939,9 @@ class Download:
             
             try:
                 if is_track:
-                    root_dir = process_folder_format_with_subdirs(folder_fmt, track_attr, legacy_charmap=legacy_flag)
+                    root_dir = process_folder_format_with_subdirs(folder_fmt, track_attr, legacy_charmap=legacy_flag, disable_truncation=disable_trunc_flag)
                 else:
-                    root_dir = process_folder_format_with_subdirs(folder_fmt, album_attr, legacy_charmap=legacy_flag)
+                    root_dir = process_folder_format_with_subdirs(folder_fmt, album_attr, legacy_charmap=legacy_flag, disable_truncation=disable_trunc_flag)
 
                 for track_metadata in tracks_meta:
                     track_artist = _safe_get(track_metadata, "performer", "name")
