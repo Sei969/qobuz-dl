@@ -61,6 +61,8 @@ class QobuzDLSettings:
         self.lrc_files = kwargs.get('lrc_files', True)
         self.embed_lyrics = kwargs.get('embed_lyrics', True)
         self.multi_value_tags = kwargs.get('multi_value_tags', False)
+        self.disable_smart_truncation = kwargs.get('disable_smart_truncation', False)
+        
 
         # cover options
         self.embed_art = kwargs.get('embed_art', False)
@@ -165,6 +167,8 @@ class QobuzDLSettings:
             'embed_lyrics': False if getattr(arguments, 'no_embed_lyrics', False) else config.getboolean(section, "embed_lyrics", fallback=True),
         
             'multi_value_tags': getattr(arguments, 'multi_value_tags', config.getboolean(section, "multi_value_tags", fallback=False)),
+
+            'disable_smart_truncation': getattr(arguments, 'disable_smart_truncation', config.getboolean(section, "disable_smart_truncation", fallback=False)),
         }
         
         return QobuzDLSettings(**kwargs)
