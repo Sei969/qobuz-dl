@@ -67,6 +67,9 @@ LOCAL_GENRE_MAP = {
     "Comédie Musicale": "Musical",
     "Bande originale de jeu vidéo": "Video Game Soundtrack",
     "Séries TV": "TV Series",
+    "Bandes originales de films": "Film Soundtracks",
+    "Jeux vidéo": "Video Games",
+    "Anime/Jeux vidéo": "Anime/Video Game",
     
     # Jazz & Blues
     "Jazz Vocal": "Vocal Jazz",
@@ -78,6 +81,9 @@ LOCAL_GENRE_MAP = {
     "Musique latine": "Latin",
     "Variété Française": "French Pop",
     "Alternatif et Indé": "Alternative & Indie",
+    "Asie": "Asia",
+    "Musique indienne": "Indian Music",
+    "Russie": "Russia",
         
     # Others
     "Enfants": "Children's Music",
@@ -88,6 +94,10 @@ LOCAL_GENRE_MAP = {
     "Religieux": "Religious",
     "Détente": "Relaxation",
     "Fêtes": "Holiday",
+    "Musiques de Noël": "Christmas Music",
+    
+    # Rock & Pop
+    "Rock progressif": "Progressive Rock",
 }
 
 def _get_title_with_version(title: str = "", version: str = "") -> str:
