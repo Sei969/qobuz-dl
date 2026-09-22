@@ -405,6 +405,11 @@ def _get_tags_to_add(qobuz_album: dict, qobuz_item : dict, settings: QobuzDLSett
                     name = parts[0]
                     roles = parts[1:]
                     
+                    # "Earth, Wind & Fire, MainArtist" is read as "Earth";
+                    # skip such truncated copies of the main artist's name
+                    if main_artist and main_artist.casefold().startswith(name.casefold() + ","):
+                        continue
+
                     if "FeaturedArtist" in roles or "MainArtist" in roles:
                         if name.casefold() not in (a.casefold() for a in artists):
                             artists.append(name)
