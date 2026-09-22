@@ -283,8 +283,22 @@ def tag_flac(
 
     for k, v in tags.items():
         if v:
-            # --- MULTI-TAG FEATURE ---
-            if getattr(settings, 'multi_value_tags', False) and k == "GENRE" and isinstance(v, str):
+            if k in ["ALBUMARTIST", "ARTIST", "COMPOSER"]:
+                raw_list = v if isinstance(v, list) else [v]
+                clean_list = []
+                for item in raw_list:
+                    if isinstance(item, str):
+                        replaced = item.replace(" & ", ",").replace("&", ",").replace("＆", ",")
+                        clean_list.extend([i.strip() for i in replaced.split(",") if i.strip()])
+                    else:
+                        clean_list.append(item)
+                
+                v = list(dict.fromkeys(clean_list))
+                if len(v) == 1:
+                    v = v[0]
+            
+            # --- MULTI-TAG FEATURE ORIGINALE ---
+            elif getattr(settings, 'multi_value_tags', False) and k == "GENRE" and isinstance(v, str):
                 if ", " in v:
                     v = v.split(", ")
             
@@ -394,8 +408,12 @@ def _get_tags_to_add(qobuz_album: dict, qobuz_item : dict, settings: QobuzDLSett
         tags["ALBUMARTIST"] = get_album_artist(qobuz_album)
         
     if not settings.no_track_artist_tag:
-        main_artist = qobuz_item.get("performer", {}).get("name", "") or qobuz_album.get("artist", {}).get("name", "")
-        artists = [main_artist] if main_artist else []
+        main_artist_raw = qobuz_item.get("performer", {}).get("name", "") or qobuz_album.get("artist", {}).get("name", "")
+        
+        if main_artist_raw:
+            artists = [a.strip() for a in main_artist_raw.replace(" & ", ", ").split(",") if a.strip()]
+        else:
+            artists = []
         
         performers_str = qobuz_item.get("performers", "")
         if performers_str:
