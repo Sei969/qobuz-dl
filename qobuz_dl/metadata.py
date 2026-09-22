@@ -424,7 +424,7 @@ def _get_tags_to_add(qobuz_album: dict, qobuz_item : dict, settings: QobuzDLSett
                     roles = parts[1:]
                     
                     if "FeaturedArtist" in roles or "MainArtist" in roles:
-                        if name not in artists:
+                        if name.casefold() not in (a.casefold() for a in artists):
                             artists.append(name)
         
         if len(artists) == 1:
@@ -446,7 +446,7 @@ def _get_tags_to_add(qobuz_album: dict, qobuz_item : dict, settings: QobuzDLSett
                     roles = parts[1:]
                     
                     if "Composer" in roles or "ComposerLyricist" in roles:
-                        if name not in composers:
+                        if name.casefold() not in (c.casefold() for c in composers):
                             composers.append(name)
                             
         if not composers:
