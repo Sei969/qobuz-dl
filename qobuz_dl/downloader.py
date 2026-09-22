@@ -733,18 +733,19 @@ class Download:
 
             search_album = _safe_get(track_metadata, "album", "title", default="")
             
-            with print_lock:                           
-                self.lyrics_engine.fetch_and_inject(
-                    file_path=final_file, 
-                    artist=search_artist, 
-                    track=track_title, 
-                    album=search_album,
-                    track_id=track_metadata.get("id"),
-                    qobuz_client=self.client,
-                    save_lrc=not self.no_lrc_files,
-                    embed_lyrics=getattr(self.settings, 'embed_lyrics', True),
-                    is_parallel=is_parallel
-                )
+            # LOCK RIMOSSO: Le chiamate HTTP sono libere, la UI è protetta da safe_print
+            self.lyrics_engine.fetch_and_inject(
+                file_path=final_file, 
+                artist=search_artist, 
+                track=track_title, 
+                album=search_album,
+                track_id=track_metadata.get("id"),
+                qobuz_client=self.client,
+                save_lrc=not self.no_lrc_files,
+                embed_lyrics=getattr(self.settings, 'embed_lyrics', True),
+                is_parallel=is_parallel,
+                print_func=safe_print
+            )
 
         delay_time = getattr(self.settings, 'delay', 0)
         if delay_time == 0 and '--delay' in sys.argv:
