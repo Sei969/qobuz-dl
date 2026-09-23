@@ -446,7 +446,7 @@ def add_common_arg(custom_parser, default_folder, default_quality):
     multiple_disc_group = custom_parser.add_argument_group('multiple disc options')
     multiple_disc_group.add_argument(
         "--multiple-disc-prefix",
-        default="CD",
+        default=None,
         metavar="PREFIX",
         help="""Setting folder prefix for multiple discs album (default: CD)
         If the album has multiple discs(media_count > 1), the album's tracks will be saved by folder.
