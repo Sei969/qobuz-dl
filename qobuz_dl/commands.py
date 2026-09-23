@@ -434,13 +434,13 @@ def add_common_arg(custom_parser, default_folder, default_quality):
     artwork_group.add_argument(
         "--embedded-art-size",
         choices=["50", "100", "150", "300", "600", "max", "org"],
-        default="600",
+        default=None,
         help="size of embedded artwork (default: 600)"
     )
     artwork_group.add_argument(
         "--saved-art-size",
         choices=["50", "100", "150", "300", "600", "max", "org"],
-        default="org",
+        default=None,
         help="size of saved artwork (default: org)"
     )
     multiple_disc_group = custom_parser.add_argument_group('multiple disc options')
