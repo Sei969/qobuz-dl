@@ -595,7 +595,7 @@ def main():
         arguments.embed_art or embed_art,
         ignore_singles_eps=arguments.albums_only or albums_only,
         no_m3u_for_playlists=arguments.no_m3u or no_m3u,
-        quality_fallback=not arguments.no_fallback or not no_fallback,
+        quality_fallback=not (arguments.no_fallback or no_fallback),
         cover_og_quality=arguments.og_cover or og_cover,
         no_cover=arguments.no_cover or no_cover,
         downloads_db=None if no_database or arguments.no_db else QOBUZ_DB,
