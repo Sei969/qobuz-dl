@@ -202,7 +202,7 @@ def _embed_flac_img(root_dir, audio: FLAC):
         if os.path.getsize(cover_image) > FLAC_MAX_BLOCKSIZE:
             raise Exception(
                 "downloaded cover size too large to embed. "
-                "turn off `og_cover` to avoid error"
+                "lower `embedded_art_size` (e.g. 600) to avoid error"
             )
 
         image = Picture()
