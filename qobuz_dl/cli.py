@@ -18,6 +18,7 @@ from qobuz_dl.commands import qobuz_dl_args
 from qobuz_dl.core import QobuzDL
 from qobuz_dl.downloader import DEFAULT_FOLDER, DEFAULT_TRACK
 from qobuz_dl.settings import QobuzDLSettings
+from qobuz_dl.utils import read_config_file
 
 logging.basicConfig(
     level=logging.INFO,
@@ -261,7 +262,7 @@ def _reset_config(config_file):
     config["qobuz"]["max_workers"] = "3"
     config["qobuz"]["user_auth_token"] = ""
     
-    with open(config_file, "w") as configfile:
+    with open(config_file, "w", encoding="utf-8") as configfile:
         config.write(configfile)
         
     logging.info(f"\n{GREEN}[+] Configuration successfully saved in {config_file}!{OFF}")
@@ -406,7 +407,7 @@ def main():
     # -------------------------------------------------
 
     config = configparser.ConfigParser(interpolation=None)
-    config.read(CONFIG_FILE)
+    read_config_file(config, CONFIG_FILE)
 
     try:
         section = "qobuz" if config.has_section("qobuz") else "DEFAULT"
@@ -436,7 +437,7 @@ def main():
                     migrated = True
             if migrated:
                 try:
-                    with open(CONFIG_FILE, "w") as f:
+                    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
                         config.write(f)
                 except OSError:
                     pass
@@ -508,7 +509,7 @@ def main():
 
     if arguments.show_config:
         print(f"Configuration: {CONFIG_FILE}\nDatabase: {QOBUZ_DB}\n---")
-        with open(CONFIG_FILE, "r") as f:
+        with open(CONFIG_FILE, "r", encoding="utf-8", errors="replace") as f:
             print(f.read())
         sys.exit()
 

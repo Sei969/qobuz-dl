@@ -1,5 +1,6 @@
 import re
 import string
+import locale
 import os
 import logging
 import subprocess
@@ -40,6 +41,30 @@ class PartialFormatter(string.Formatter):
             if self.bad_fmt:
                 return self.bad_fmt
             raise
+
+def read_config_file(config, path):
+    """
+    Reads config.ini into a ConfigParser as UTF-8, like every other text file
+    written by qobuz-dl.
+
+    Files saved by older versions in the system encoding (e.g. cp1252 on Windows)
+    are still read by falling back to that encoding.
+
+    Args:
+        config (configparser.ConfigParser): The parser to fill.
+        path (str): Path to config.ini.
+
+    Returns:
+        list: The files that were successfully read (as ConfigParser.read).
+    """
+    try:
+        return config.read(path, encoding="utf-8")
+    except UnicodeDecodeError:
+        for section in config.sections():
+            config.remove_section(section)
+        config[config.default_section].clear()
+        return config.read(path, encoding=locale.getpreferredencoding(False))
+
 
 def make_m3u(pl_directory, remote_items=None):
     """
