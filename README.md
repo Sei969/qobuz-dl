@@ -39,6 +39,7 @@ Search, explore, and download Lossless and Hi-Res music from [Qobuz](https://www
 * **Limitless Playlists:** Overcomes Qobuz API restrictions by dynamically paginating chunk requests, allowing you to seamlessly queue and download massive playlists without the standard 50-track bottleneck.
 * **Smart Resume (No Overwrites):** Intelligently detects existing files on your local drive and automatically skips them. If a massive discography download gets interrupted, it resumes instantly without wasting time or bandwidth re-downloading existing tracks.
 * **Anti-Spam Blacklist Engine:** Automatically filter out unwanted "junk" releases (e.g., Karaoke versions, Instrumental Covers, Tribute albums) when downloading massive artist discographies or label catalogs. You can pass a `.txt` file containing your custom keywords (e.g., `Karaoke`, `(Live)`, `Original Soundtrack`) via the CLI flag `-b` or permanently set it in your `config.ini`. The engine dynamically joins the main title and version tags, ensuring flawless filtering before a single byte of audio is downloaded.
+* **Label Intersection Filter:** Effortlessly clean up messy artist pages filled with homonyms or AI-generated junk. Use the new `--filter-label` flag to cross-reference an artist's discography against a strictly curated label name or Qobuz Label ID. The pre-flight engine will intelligently skip any release that doesn't match the label criteria, supporting fuzzy text matching for robust filtering.
 * **Stateful Batch Downloading (Text File Memory):** When downloading massive queues from a `.txt` file, the engine acts as a living database. It automatically validates URLs and appends a `[DONE]` tag next to completed links directly inside your text file. If your connection drops or you abort the process, simply re-run the command: the engine will instantly skip the completed links and seamlessly resume the queue exactly where it left off.
 * **Flawless `.m3u` Generation:** Automatically generates playlist files with correct relative folder paths. **v2.0.1 features a robust 4-pass matching algorithm** (ID -> ISRC -> Title -> Filename) that guarantees the `.m3u` file perfectly mirrors the API order, even when tracks have no numerical prefixes in their filenames.
 * **Ultra-Fast O(1) Matching Engine:** The playlist generator now uses high-performance dictionary indexing. It identifies local files instantly, reducing the processing time for massive playlists from seconds to milliseconds. (Thanks to marrobHD)
@@ -155,12 +156,6 @@ directory = ~/Music/Qobuz_Lossless
 # to save tokens in config.ini instead of the OS Keyring.
 disable_keyring = false
 
-# Set to 'true' to restore classic ASCII character replacements
-legacy_charmap = false
-
-# Set to 'true' to disable external .lrc file generation
-no_lrc_files = true
-
 # Set to 'true' to bypass automatic path truncation for extremely long album/track names
 disable_smart_truncation = false
 
@@ -204,7 +199,7 @@ usage: python -m qobuz_dl [-h] [-r] [-p] [--sync-db [PATH]] [-sc] {interactive,i
 [Download Usage]
 usage: python -m qobuz_dl dl [-h] [-d PATH] [-q int] [--albums-only] [--no-m3u] [--no-fallback] [--no-db] 
                              [-ff PATTERN] [-tf PATTERN] [-s] [-e] [--no-cover]
-                             [-b PATH]
+                             [-b PATH] [--filter-label STRING]
                              [--embedded-art-size {50,100,150,300,600,max,org}] 
                              [--saved-art-size {50,100,150,300,600,max,org}] 
                              [--multiple-disc-prefix PREFIX] [--multiple-disc-one-dir] 
@@ -248,6 +243,13 @@ Downloading a massive artist discography but want to avoid wasting space on Kara
 *(Tip: You can set `blacklist = blacklist.txt` in your `config.ini` to make this automatic for every download).*
 ```bash
 python -m qobuz_dl dl [https://play.qobuz.com/artist/123456](https://play.qobuz.com/artist/123456) -b blacklist.txt
+```
+
+**Label Intersection Filter:**
+Is an artist's discography page cluttered with homonyms or AI-generated junk? Cross-reference their page URL against a strictly curated label name. The engine will elegantly skip any release that doesn't belong to the target label. Supports fuzzy matching (e.g., `"Deutsche Grammophon"` will match `"Deutsche Grammophon (DG)"`).
+*(Tip: On Windows, always wrap the label name in double quotes).*
+```bash
+python -m qobuz_dl dl [https://play.qobuz.com/artist/123456](https://play.qobuz.com/artist/123456) --filter-label "Deutsche Grammophon"
 ```
 
 **Ultimate Anti-Ban Mode (Stealth + Delay):**
@@ -414,5 +416,5 @@ You can import our core engines (AES-Segmented Downloader, Audiophile Tagger, an
 * **Sorrow446 & DashLt**: `qobuz-dl` is inspired by the discontinued Qo-DL-Reborn. This tool uses the core API module `qopy`, originally written by them.
 
 ## ⚠️ Disclaimer
-* This tool was written for educational purposes.
-* `qobuz-dl` is not affiliated with Qobuz.
+* This tool was written for educational purposes only.
+* `qobuz-dl Ultimate` is not affiliated with Qobuz.
