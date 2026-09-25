@@ -421,7 +421,7 @@ def main():
             ini_password = config.get(section, "password", fallback="")
             token = ini_token if ini_token else ini_password
             genius_token = ini_genius
-            password = ini_password
+            password = token if token else ini_password
         else:
             token = _keyring_load("auth_token") or ini_token
             password = token if token else config.get(section, "password", fallback="")
