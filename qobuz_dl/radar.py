@@ -5,6 +5,7 @@ import xml.etree.ElementTree as ET
 import questionary
 from qobuz_dl.qopy import Client
 from qobuz_dl.color import GREEN, YELLOW, RED, CYAN, OFF
+from qobuz_dl.utils import read_config_file
 
 def setup_client(config_path, config, section):
     """Initializes the Qobuz client reading from the config file."""
@@ -30,7 +31,7 @@ def get_or_save_rss_link(config_path, config, section):
     
     if rss_link:
         config.set(section, 'musicbutler_rss', rss_link)
-        with open(config_path, 'w') as configfile:
+        with open(config_path, 'w', encoding='utf-8') as configfile:
             config.write(configfile)
         print(f"{GREEN}[+] Link permanently saved to config!{OFF}\n")
     
@@ -68,7 +69,7 @@ def run_radar():
     config_path = os.path.join(appdata_path, 'qobuz-dl', 'config.ini')
     
     config = configparser.ConfigParser()
-    config.read(config_path)
+    read_config_file(config, config_path)
     if not config.sections():
         print(f"{RED}[!] config.ini file not found at {config_path}{OFF}")
         return
