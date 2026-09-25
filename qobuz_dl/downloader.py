@@ -21,7 +21,7 @@ import qobuz_dl.metadata as metadata
 from qobuz_dl.color import OFF, GREEN, RED, YELLOW, CYAN
 from qobuz_dl.exceptions import NonStreamable
 from qobuz_dl.settings import QobuzDLSettings
-from qobuz_dl.utils import get_album_artist, clean_filename
+from qobuz_dl.utils import get_album_artist, clean_filename, label_matches
 from qobuz_dl.db import handle_download_id
 from qobuz_dl.constants import DEFAULT_FOLDER, DEFAULT_TRACK, DEFAULT_MULTIPLE_DISC_TRACK, OK_MAX_CHARACTER_LENGTH
 
@@ -267,16 +267,8 @@ class Download:
         """
         filter_label = getattr(self.settings, 'filter_label', None)
         if filter_label:
-            album_label_name = str(album_meta.get("label", {}).get("name", "")).strip()
-            album_label_id = str(album_meta.get("label", {}).get("id", "")).strip()
-            
-            is_match = False
-            if filter_label.isdigit() and filter_label == album_label_id:
-                is_match = True
-            elif filter_label.lower() in album_label_name.lower():
-                is_match = True
-                
-            if not is_match:
+            album_label_name = str((album_meta.get("label") or {}).get("name") or "").strip()
+            if not label_matches(album_meta.get("label"), filter_label):
                 logger.info(f"{OFF}Skipping '{album_meta.get('title', 'Unknown')}': Label mismatch (Found: \"{album_label_name}\", Filter: \"{filter_label}\")")
                 return
         # --------------------------------------
@@ -512,16 +504,9 @@ class Download:
             """
             filter_label = getattr(self.settings, 'filter_label', None)
             if filter_label:
-                album_label_name = str(track_meta.get("album", {}).get("label", {}).get("name", "")).strip()
-                album_label_id = str(track_meta.get("album", {}).get("label", {}).get("id", "")).strip()
-                
-                is_match = False
-                if filter_label.isdigit() and filter_label == album_label_id:
-                    is_match = True
-                elif filter_label.lower() in album_label_name.lower():
-                    is_match = True
-                    
-                if not is_match:
+                track_label = (track_meta.get("album") or {}).get("label")
+                album_label_name = str((track_label or {}).get("name") or "").strip()
+                if not label_matches(track_label, filter_label):
                     logger.info(f"{OFF}Skipping track '{track_title}': Label mismatch (Found: \"{album_label_name}\", Filter: \"{filter_label}\")")
                     return
             # --------------------------------------

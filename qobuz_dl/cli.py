@@ -8,6 +8,7 @@ import os
 import getpass
 import hashlib
 import signal
+from urllib.parse import urlparse
 import keyring
 import requests
 
@@ -586,7 +587,8 @@ def main():
     filter_label_val = getattr(arguments, 'filter_label', None)
     if filter_label_val:
         if "label/" in filter_label_val:
-            filter_label_val = filter_label_val.rstrip('/').split('/')[-1]
+            # Use only the URL path, so query strings like "?ref=..." are ignored.
+            filter_label_val = urlparse(filter_label_val).path.rstrip('/').split('/')[-1]
     settings.filter_label = filter_label_val
     # --------------------------------------
     

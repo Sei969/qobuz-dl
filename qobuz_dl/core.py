@@ -16,6 +16,7 @@ from qobuz_dl.utils import (
     get_url_info,
     make_m3u,
     smart_discography_filter,
+    label_matches,
     format_duration,
     create_and_return_dir,
     PartialFormatter,
@@ -268,6 +269,23 @@ class QobuzDL:
                 for chunk in content:
                     batch = chunk.get(type_dict["iterable_key"], {}).get("items", [])
                     items.extend(batch)
+
+            # --- LABEL INTERSECTION PRE-FILTER ---
+            # The artist listing already carries each release's label, so releases from
+            # other labels are dropped here instead of fetching their full metadata first.
+            # Items without label data are kept and checked again during the download.
+            filter_label = getattr(self.settings, "filter_label", None)
+            if filter_label and url_type == "artist":
+                total = len(items)
+                items = [
+                    item for item in items
+                    if "label" not in item or label_matches(item.get("label"), filter_label)
+                ]
+                logger.info(
+                    f"{YELLOW}[*] Label filter: {len(items)} of {total} releases "
+                    f"match \"{filter_label}\"{OFF}"
+                )
+            # --------------------------------------
 
             # --- NEW: INTERACTIVE RELEASE TYPE FILTER (LAZY STATIC MENU) ---
             if getattr(self, '_is_interactive_session', False) and url_type == "artist":

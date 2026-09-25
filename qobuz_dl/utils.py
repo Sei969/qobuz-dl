@@ -188,6 +188,28 @@ def make_m3u(pl_directory, remote_items=None):
             pl.write("\n".join(track_list))
 
 
+def label_matches(label, filter_label):
+    """
+    Checks whether a Qobuz label matches the --filter-label value.
+
+    A numeric filter must equal the label ID; any filter also matches when it is
+    contained in the label name (case-insensitive). A missing label never matches.
+
+    Args:
+        label (dict | None): The "label" object from the Qobuz API.
+        filter_label (str): The label name or numeric label ID given by the user.
+
+    Returns:
+        bool: True if the label matches the filter.
+    """
+    label = label or {}
+    name = str(label.get("name") or "").strip()
+    label_id = str(label.get("id") or "").strip()
+    if filter_label.isdigit() and filter_label == label_id:
+        return True
+    return bool(name) and filter_label.lower() in name.lower()
+
+
 def smart_discography_filter(
     contents: list, save_space: bool = False, skip_extras: bool = False
 ) -> list:
