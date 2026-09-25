@@ -259,6 +259,28 @@ class Download:
             logger.info(f'{OFF}Ignoring Single/EP/VA: {album_meta.get("title", "n/a")}')
             return
 
+        # --- LABEL INTERSECTION FILTER ---
+        """
+        Smart Label Filtering Engine.
+        Cross-references the downloaded album's label metadata against the user's --filter-label request.
+        Safely aborts the download queue for this specific album if there's no match.
+        """
+        filter_label = getattr(self.settings, 'filter_label', None)
+        if filter_label:
+            album_label_name = str(album_meta.get("label", {}).get("name", "")).strip()
+            album_label_id = str(album_meta.get("label", {}).get("id", "")).strip()
+            
+            is_match = False
+            if filter_label.isdigit() and filter_label == album_label_id:
+                is_match = True
+            elif filter_label.lower() in album_label_name.lower():
+                is_match = True
+                
+            if not is_match:
+                logger.info(f"{OFF}Skipping '{album_meta.get('title', 'Unknown')}': Label mismatch (Found: \"{album_label_name}\", Filter: \"{filter_label}\")")
+                return
+        # --------------------------------------
+
         album_title = _get_title(album_meta)
         url = album_meta.get("url", "")
         release_date = album_meta.get("release_date_original", "")
@@ -483,6 +505,27 @@ class Download:
             track_title = _get_title(track_meta)
             artist = _safe_get(track_meta, "performer", "name")
             logger.info(f"\n{YELLOW}Downloading: {artist} - {track_title}{OFF}")
+            
+            # --- LABEL INTERSECTION FILTER ---
+            """
+            Smart Label Filtering Engine for standalone tracks and playlists.
+            """
+            filter_label = getattr(self.settings, 'filter_label', None)
+            if filter_label:
+                album_label_name = str(track_meta.get("album", {}).get("label", {}).get("name", "")).strip()
+                album_label_id = str(track_meta.get("album", {}).get("label", {}).get("id", "")).strip()
+                
+                is_match = False
+                if filter_label.isdigit() and filter_label == album_label_id:
+                    is_match = True
+                elif filter_label.lower() in album_label_name.lower():
+                    is_match = True
+                    
+                if not is_match:
+                    logger.info(f"{OFF}Skipping track '{track_title}': Label mismatch (Found: \"{album_label_name}\", Filter: \"{filter_label}\")")
+                    return
+            # --------------------------------------
+            
             url = track_meta.get("album", {}).get("url", "")
             release_date = track_meta.get("release_date_original", "")
             format_info = self._get_format(track_meta, is_track_id=True, track_url_dict=parse)

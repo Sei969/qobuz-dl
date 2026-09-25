@@ -102,6 +102,15 @@ def dl_args(subparsers):
     )
     # --- END BLACKLIST FLAG ---
     
+    # --- START LABEL INTERSECTION FLAG ---
+    download.add_argument(
+        "--filter-label",
+        type=str,
+        default=None,
+        help="Filter downloads by label name or Qobuz label URL/ID",
+    )
+    # --- END LABEL INTERSECTION FLAG ---
+    
     return download
 
 def lyrics_args(subparsers):

@@ -578,6 +578,18 @@ def main():
     settings = QobuzDLSettings.from_arguments_configparser(arguments, config)
     settings.legacy_charmap = legacy_charmap
     
+    # --- LABEL INTERSECTION FILTER ---
+    """
+    Safely injects the parsed --filter-label CLI argument into settings.
+    Accepts both standard string names or direct Qobuz Label URLs to extract the exact ID.
+    """
+    filter_label_val = getattr(arguments, 'filter_label', None)
+    if filter_label_val:
+        if "label/" in filter_label_val:
+            filter_label_val = filter_label_val.rstrip('/').split('/')[-1]
+    settings.filter_label = filter_label_val
+    # --------------------------------------
+    
     # Execute the Pre-flight Config Check
     # --- PRE-FLIGHT CONFIG CHECK ---
     formats_to_validate = {
