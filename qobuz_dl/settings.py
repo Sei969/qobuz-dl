@@ -85,6 +85,9 @@ class QobuzDLSettings:
         # user_auth_token
         self.user_auth_token = kwargs.get('user_auth_token', '')
 
+        # Seconds to wait between track (and album) downloads; > 0 also disables multithreading
+        self.delay = max(0, int(kwargs.get('delay') or 0))
+
     @staticmethod
     def from_arguments_configparser(arguments, config):
         """
@@ -169,6 +172,8 @@ class QobuzDLSettings:
             'multi_value_tags': getattr(arguments, 'multi_value_tags', config.getboolean(section, "multi_value_tags", fallback=False)),
 
             'disable_smart_truncation': getattr(arguments, 'disable_smart_truncation', config.getboolean(section, "disable_smart_truncation", fallback=False)),
+
+            'delay': getattr(arguments, 'delay', 0),
         }
         
         return QobuzDLSettings(**kwargs)

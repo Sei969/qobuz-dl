@@ -1,7 +1,6 @@
 from .lyrics_engine import LyricsEngine
 import logging
 import os
-import sys
 import time
 import random
 import subprocess
@@ -336,9 +335,6 @@ class Download:
         is_multiple = True if media_count > 1 else False
         
         delay_time = getattr(self.settings, 'delay', 0)
-        if delay_time == 0 and '--delay' in sys.argv:
-            try: delay_time = int(sys.argv[sys.argv.index('--delay') + 1])
-            except: pass
             
         active_workers = int(getattr(self.settings, 'max_workers', 3))
         is_parallel = False
@@ -791,9 +787,6 @@ class Download:
             )
 
         delay_time = getattr(self.settings, 'delay', 0)
-        if delay_time == 0 and '--delay' in sys.argv:
-            try: delay_time = int(sys.argv[sys.argv.index('--delay') + 1])
-            except: pass
             
         if delay_time > 0 and not abort_event.is_set():
             safe_print(f"{YELLOW}[*] Sleeping for {delay_time} seconds to prevent rate limiting...{OFF}")

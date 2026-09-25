@@ -206,9 +206,10 @@ class QobuzDL:
             logger.error(f"{RED}Error getting release: {e}. Skipping...")
             
         # --- HUMAN BEHAVIOR DELAY ---
-        if getattr(self, 'delay', 0) > 0:
-            logger.info(f"{YELLOW}[*] Sleeping for {self.delay} seconds to prevent rate limiting...{OFF}")
-            time.sleep(self.delay)
+        delay = getattr(self.settings, 'delay', 0)
+        if delay > 0:
+            logger.info(f"{YELLOW}[*] Sleeping for {delay} seconds to prevent rate limiting...{OFF}")
+            time.sleep(delay)
 
     def handle_url(self, url):
         """
