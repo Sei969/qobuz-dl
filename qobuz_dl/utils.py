@@ -279,13 +279,15 @@ def smart_discography_filter(
         regex = TYPE_REGEXES[album_t]
         return re.search(regex, f"{title} {version}") is not None
 
-    def essence(album: dict) -> str:
+    def essence(album: str) -> str:
         """Ignore text in parens/brackets, return all lowercase.
         Used to group two albums that may be named similarly, but not exactly
         the same.
         """
-        r = re.match(r"([^\(]+)(?:\s*[\(\[][^\)][\)\]])*", album)
-        return r.group(1).strip().lower()
+        # Skip leading parentheses, e.g. "(What's the Story) Morning Glory?"
+        title = re.sub(r"^\s*(?:\([^)]*\)\s*)+", "", album)
+        r = re.match(r"[^\(]+", title)
+        return (r.group(0) if r else album).strip().lower()
 
     requested_artist = contents[0]["name"]
     # The discography comes in pages of 50 releases; use all of them, not just the first
