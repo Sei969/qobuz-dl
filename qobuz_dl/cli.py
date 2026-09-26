@@ -523,6 +523,7 @@ def main():
 
     # --- NEW DB SYNC FEATURE (Lightweight Mode) ---
     if getattr(arguments, 'sync_db', None):
+        from qobuz_dl.db import create_db
         from qobuz_dl.sync import sync_database
         from qobuz_dl.qopy import Client
                 
@@ -539,6 +540,9 @@ def main():
                 
         # Record the entries with the usual quality: downloads look them up by ID and quality
         sync_quality = int(default_quality) if str(default_quality).strip().isdigit() else 27
+        # The downloads table is otherwise only created when the downloader starts, so on
+        # a fresh (or lost) database there would be nothing to write the entries into
+        create_db(QOBUZ_DB)
         sync_database(sync_dir, QOBUZ_DB, sync_client, quality=sync_quality)
         sys.exit(f"\n{GREEN}Database synchronization finished successfully.{OFF}")
     # ----------------------------------------------
