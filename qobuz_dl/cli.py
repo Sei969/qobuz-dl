@@ -619,7 +619,7 @@ def main():
         track_format=arguments.track_format or track_format,
         smart_discography=arguments.smart_discography or smart_discography,
         fetch_lyrics=fetch_lyrics,
-        no_lrc_files=("--no-lrc-files" in sys.argv) or no_lrc_files_config,
+        no_lrc_files=not getattr(arguments, 'lrc_files', True) or no_lrc_files_config,
         genius_token=genius_token,
         force_english=force_english,
         no_credits=no_credits_flag,
