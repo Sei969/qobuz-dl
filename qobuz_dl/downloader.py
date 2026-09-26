@@ -468,7 +468,12 @@ class Download:
         
         if aborted_by_user:
             os._exit(1)
-            
+
+        # An incomplete album stays out of the database, so the next run retries its missing tracks
+        if failed_tracks > 0:
+            safe_print(f"{YELLOW}[!] Not recorded in the database: {failed_tracks} tracks failed. Run again to retry them.{OFF}")
+            return
+
         # --- DATABASE UPGRADE: Inject artist and album metadata ---
         db_artist = album_attr.get("album_artist", "Unknown")
         db_album = album_attr.get("album_title", "Unknown")
@@ -555,7 +560,7 @@ class Download:
                 
             is_mp3 = True if int(self.quality) == 5 else False
             
-            self._download_and_tag(
+            track_ok = self._download_and_tag(
                 dirn,
                 1,
                 parse,
@@ -566,9 +571,14 @@ class Download:
                 False,
                 is_parallel=False
             )
-            
+
             _clean_embed_art(dirn, self.settings)
-            
+
+            # A failed track stays out of the database, so the next run retries it
+            if not track_ok:
+                logger.info(f"{YELLOW}[!] Not recorded in the database: '{track_title}' failed. Run again to retry it.{OFF}")
+                return
+
             # --- DATABASE UPGRADE: Inject artist and album metadata ---
             db_artist = track_attr.get("artist", "Unknown")
             db_album = track_attr.get("album", "Unknown")
