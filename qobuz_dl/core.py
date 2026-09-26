@@ -1,7 +1,6 @@
 import logging
 import os
 import sys
-import time
 import re
 
 import requests
@@ -205,12 +204,9 @@ class QobuzDL:
             dloader.download_id_by_type(not album)
         except (requests.exceptions.RequestException, NonStreamable) as e:
             logger.error(f"{RED}Error getting release: {e}. Skipping...")
-            
-        # --- HUMAN BEHAVIOR DELAY ---
-        delay = getattr(self.settings, 'delay', 0)
-        if delay > 0:
-            logger.info(f"{YELLOW}[*] Sleeping for {delay} seconds to prevent rate limiting...{OFF}")
-            time.sleep(delay)
+
+        # No --delay pause here: the downloader already sleeps after every track,
+        # including the last one of an album, so a second pause would double it.
 
     def handle_url(self, url):
         """
@@ -259,6 +255,30 @@ class QobuzDL:
                 os.path.join(self.directory, sanitize_filename(content_name))
             )
 
+            # --- LABEL INTERSECTION PRE-FILTER ---
+            # The artist listing already carries each release's label, so releases from
+            # other labels are dropped here instead of fetching their full metadata first.
+            # It runs before the smart discography filter, so that one picks the best
+            # version among the releases on the requested label.
+            # Items without label data are kept and checked again during the download.
+            filter_label = getattr(self.settings, "filter_label", None)
+            if filter_label and url_type == "artist":
+                total = matching = 0
+                for chunk in content:
+                    albums = chunk.get(type_dict["iterable_key"]) or {}
+                    batch = albums.get("items", [])
+                    albums["items"] = [
+                        item for item in batch
+                        if "label" not in item or label_matches(item.get("label"), filter_label)
+                    ]
+                    total += len(batch)
+                    matching += len(albums["items"])
+                logger.info(
+                    f"{YELLOW}[*] Label filter: {matching} of {total} releases "
+                    f"match \"{filter_label}\"{OFF}"
+                )
+            # --------------------------------------
+
             if self.smart_discography and url_type == "artist":
                 items = smart_discography_filter(
                     content,
@@ -270,23 +290,6 @@ class QobuzDL:
                 for chunk in content:
                     batch = chunk.get(type_dict["iterable_key"], {}).get("items", [])
                     items.extend(batch)
-
-            # --- LABEL INTERSECTION PRE-FILTER ---
-            # The artist listing already carries each release's label, so releases from
-            # other labels are dropped here instead of fetching their full metadata first.
-            # Items without label data are kept and checked again during the download.
-            filter_label = getattr(self.settings, "filter_label", None)
-            if filter_label and url_type == "artist":
-                total = len(items)
-                items = [
-                    item for item in items
-                    if "label" not in item or label_matches(item.get("label"), filter_label)
-                ]
-                logger.info(
-                    f"{YELLOW}[*] Label filter: {len(items)} of {total} releases "
-                    f"match \"{filter_label}\"{OFF}"
-                )
-            # --------------------------------------
 
             # --- NEW: INTERACTIVE RELEASE TYPE FILTER (LAZY STATIC MENU) ---
             if getattr(self, '_is_interactive_session', False) and url_type == "artist":
