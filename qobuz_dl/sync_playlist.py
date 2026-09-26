@@ -244,6 +244,12 @@ def sync_playlist(qobuz_dl, url, folder, auto_confirm=False):
     for idx, item in enumerate(remote_items, start=1):
         position_map[str(item["id"])] = idx
 
+    # The scan shows these tracks are missing from the folder, so they are downloaded
+    # even if the database lists them (deleted files, tracks added back to the playlist,
+    # tracks downloaded for another playlist). If some files have no QOBUZTRACKID the scan
+    # cannot tell what is really missing, so the database check stays to avoid duplicates.
+    ignore_db = not untagged
+
     downloaded_count = 0
     for tid in to_download_ids:
         playlist_idx = position_map.get(tid, 0)
@@ -254,6 +260,7 @@ def sync_playlist(qobuz_dl, url, folder, auto_confirm=False):
                 alt_path=target_folder,
                 is_playlist=True,
                 playlist_index=playlist_idx,
+                ignore_db=ignore_db,
             )
             downloaded_count += 1
         except Exception as e:
