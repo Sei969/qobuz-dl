@@ -353,10 +353,17 @@ def tag_mp3(filename, root_dir, final_name, d, album, istrack=True, em_image=Fal
                 else:
                     audio[id3tag.__name__] = id3tag(encoding=3, text=v)
 
-    audio["TRCK"] = id3.TRCK(encoding=3,
-                             text=f'{str(qobuz_item.get("track_number", "1"))}/{str(qobuz_album.get("tracks_count", "1"))}')
-    audio["TPOS"] = id3.TPOS(encoding=3,
-                             text=f'{str(qobuz_item.get("media_number", "1"))}/{str(qobuz_album.get("media_count", "1"))}')
+    # "number/total", following the same tag flags as tag_flac()
+    if not settings.no_track_number_tag:
+        track = str(qobuz_item.get("track_number", "1"))
+        if not settings.no_track_total_tag:
+            track += f'/{str(qobuz_album.get("tracks_count", "1"))}'
+        audio["TRCK"] = id3.TRCK(encoding=3, text=track)
+    if not settings.no_disc_number_tag:
+        disc = str(qobuz_item.get("media_number", "1"))
+        if not settings.no_disc_total_tag:
+            disc += f'/{str(qobuz_album.get("media_count", "1"))}'
+        audio["TPOS"] = id3.TPOS(encoding=3, text=disc)
 
     if em_image:
         _embed_id3_img(root_dir, audio)
