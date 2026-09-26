@@ -490,7 +490,8 @@ def main():
             fetch_lyrics = False
             
         force_english = not getattr(arguments, 'native_lang', False)
-        no_credits_flag = getattr(arguments, 'no_credits', False) or no_credits_config 
+        # --with-credits overrides no_credits = true from config.ini
+        no_credits_flag = (getattr(arguments, 'no_credits', False) or no_credits_config) and not getattr(arguments, 'with_credits', False)
         
     except (configparser.Error, KeyError) as error:
         arguments = qobuz_dl_args().parse_args()
