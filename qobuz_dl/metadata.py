@@ -35,8 +35,10 @@ ID3_LEGEND = {
     "year": id3.TYER,
     "performer": id3.TOPE,
     # --- DB SYNC FEATURE: CUSTOM QOBUZ IDS ---
-    "QOBUZ TRACK ID": id3.TXXX,
-    "QOBUZ ALBUM ID": id3.TXXX,
+    # Keys as returned by _get_tags_to_add(); sync-playlist, --sync-db, the lyrics
+    # command and the .m3u matching read them back as TXXX:QOBUZTRACKID/QOBUZALBUMID
+    "QOBUZTRACKID": id3.TXXX,
+    "QOBUZALBUMID": id3.TXXX,
     "QOBUZ ALBUM URL": id3.TXXX,
     # --- REPLAYGAIN ---
     "replaygain_track_gain": id3.TXXX,
