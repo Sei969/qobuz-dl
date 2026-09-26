@@ -768,6 +768,9 @@ class Download:
             )
         except Exception as e:
             safe_print(f"{RED}[!] Error tagging: {e}{OFF}")
+            # The audio is left in the temporary file, which is removed at the end of the
+            # run, so the track failed: the album stays [INCOMPLETE] and is retried next time
+            return False
 
         if getattr(self, 'fetch_lyrics', False) and hasattr(self, 'lyrics_engine') and not abort_event.is_set():
             album_artist = _safe_get(track_metadata, "album", "artist", "name")
