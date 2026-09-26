@@ -537,7 +537,9 @@ def main():
             if not sync_dir.startswith("\\\\?\\"):
                 sync_dir = "\\\\?\\" + sync_dir
                 
-        sync_database(sync_dir, QOBUZ_DB, sync_client)
+        # Record the entries with the usual quality: downloads look them up by ID and quality
+        sync_quality = int(default_quality) if str(default_quality).strip().isdigit() else 27
+        sync_database(sync_dir, QOBUZ_DB, sync_client, quality=sync_quality)
         sys.exit(f"\n{GREEN}Database synchronization finished successfully.{OFF}")
     # ----------------------------------------------
 

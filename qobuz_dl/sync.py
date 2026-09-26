@@ -8,11 +8,11 @@ from qobuz_dl.color import GREEN, RED, YELLOW, CYAN, OFF
 
 logger = logging.getLogger(__name__)
 
-def sync_database(directory, db_path, client):
+def sync_database(directory, db_path, client, quality=27):
     """
     Executes the Smart Reverse Lookup operation.
 
-    Recursively scans the provided directory for audio files, extracts native QOBUZTRACKID 
+    Recursively scans the provided directory for audio files, extracts native QOBUZTRACKID
     and QOBUZALBUMID tags, and reconstructs the SQLite database to prevent future duplicate downloads.
     If custom tags are missing, it falls back to querying the Qobuz API using the embedded ISRC code.
 
@@ -20,6 +20,9 @@ def sync_database(directory, db_path, client):
         directory (str): The root directory containing the user's downloaded music library.
         db_path (str): The local path to the target SQLite database file.
         client (Client): The initialized Qobuz API client for fallback ISRC lookups.
+        quality (int, optional): The quality the entries are recorded with. The database is
+            checked with the quality of each download, so this should be the usual one
+            (default_quality from config.ini). Defaults to 27.
     """
     logger.info(f"\n{YELLOW}[*] Starting Local Database Synchronization...{OFF}")
     logger.info(f"{YELLOW}[*] Scanning directory: {directory}{OFF}")
@@ -46,7 +49,6 @@ def sync_database(directory, db_path, client):
             track_id = None
             album_id = None
             isrc = None
-            quality = 27
             file_format = "FLAC" if file_path.lower().endswith(".flac") else "MP3"
 
             try:
