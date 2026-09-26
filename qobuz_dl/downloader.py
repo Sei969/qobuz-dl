@@ -749,8 +749,15 @@ class Download:
         if abort_event.is_set():
             return False
 
+        # Use the format the server actually delivered (e.g. MP3 after falling back from
+        # lossless), and give the file the matching extension instead of the requested one
+        try:
+            final_fmt = int(fresh_track_dict.get("format_id") or final_fmt)
+        except (TypeError, ValueError):
+            pass
         is_mp3 = True if final_fmt == 5 else False
         extension = ".mp3" if is_mp3 else ".flac"
+        final_file = os.path.splitext(final_file)[0] + extension
 
         tag_function = metadata.tag_mp3 if is_mp3 else metadata.tag_flac
         try:
