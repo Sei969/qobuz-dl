@@ -382,7 +382,7 @@ def main():
         from qobuz_dl.radar import run_radar
         
         try:
-            run_radar()
+            run_radar(CONFIG_FILE)
         except KeyboardInterrupt:
             print("\n\n\033[91m[!] Radar manually interrupted by the user (CTRL+C).\033[0m")
         sys.exit(0)

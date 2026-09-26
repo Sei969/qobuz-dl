@@ -31,6 +31,8 @@ requirements = [
     # NOTE: cryptography was used in the original downloader, keeping it for safety
     "cryptography",
     "keyring",
+    # used by the radar command
+    "questionary",
 ]
 
 setup(
