@@ -492,8 +492,7 @@ class Download:
             
             track_title = _get_title(track_meta)
             artist = _safe_get(track_meta, "performer", "name")
-            logger.info(f"\n{YELLOW}Downloading: {artist} - {track_title}{OFF}")
-            
+
             # --- LABEL INTERSECTION FILTER ---
             """
             Smart Label Filtering Engine for standalone tracks and playlists.
@@ -506,7 +505,9 @@ class Download:
                     logger.info(f"{OFF}Skipping track '{track_title}': Label mismatch (Found: \"{album_label_name}\", Filter: \"{filter_label}\")")
                     return
             # --------------------------------------
-            
+
+            logger.info(f"\n{YELLOW}Downloading: {artist} - {track_title}{OFF}")
+
             url = track_meta.get("album", {}).get("url", "")
             release_date = track_meta.get("release_date_original", "")
             format_info = self._get_format(track_meta, is_track_id=True, track_url_dict=parse)

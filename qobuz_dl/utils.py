@@ -47,6 +47,7 @@ def read_config_file(config, path):
     Reads config.ini into a ConfigParser as UTF-8, like every other text file
     written by qobuz-dl.
 
+    A UTF-8 BOM (added by some editors, e.g. older Windows Notepad) is skipped.
     Files saved by older versions in the system encoding (e.g. cp1252 on Windows)
     are still read by falling back to that encoding.
 
@@ -58,7 +59,7 @@ def read_config_file(config, path):
         list: The files that were successfully read (as ConfigParser.read).
     """
     try:
-        return config.read(path, encoding="utf-8")
+        return config.read(path, encoding="utf-8-sig")
     except UnicodeDecodeError:
         for section in config.sections():
             config.remove_section(section)
@@ -287,7 +288,8 @@ def smart_discography_filter(
         return r.group(1).strip().lower()
 
     requested_artist = contents[0]["name"]
-    items = [item["albums"]["items"] for item in contents][0]
+    # The discography comes in pages of 50 releases; use all of them, not just the first
+    items = [album for page in contents for album in page["albums"]["items"]]
 
     # use dicts to group duplicate albums together by title
     title_grouped = dict()
