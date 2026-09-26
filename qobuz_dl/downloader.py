@@ -702,7 +702,8 @@ class Download:
         except ValueError:
             start_idx = 0
             
-        qualities_to_try = FALLBACK_TIERS[start_idx:]
+        # With --no-fallback a track is saved in the requested quality or not at all
+        qualities_to_try = FALLBACK_TIERS[start_idx:] if self.downgrade_quality else [int(self.quality)]
         success = False
         final_fmt = int(self.quality)
 
