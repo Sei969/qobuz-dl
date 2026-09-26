@@ -22,7 +22,6 @@ ID3_LEGEND = {
     "album": id3.TALB,
     "artist": id3.TPE1,
     "title": id3.TIT2,
-    "date": id3.TDAT,
     "mediatype": id3.TMED,
     "genre": id3.TCON,
     "composer": id3.TCOM,
@@ -337,6 +336,13 @@ def tag_mp3(filename, root_dir, final_name, d, album, istrack=True, em_image=Fal
         qobuz_album = album
 
     tags = _get_tags_to_add(qobuz_album, qobuz_item, settings=settings)
+
+    # ID3v2.3 stores the year in TYER and only the day and month (DDMM) in TDAT
+    release_date = tags.pop("DATE", "") or ""
+    if release_date[:4].isdigit():
+        audio["TYER"] = id3.TYER(encoding=3, text=release_date[:4])
+        if release_date[5:7].isdigit() and release_date[8:10].isdigit():
+            audio["TDAT"] = id3.TDAT(encoding=3, text=release_date[8:10] + release_date[5:7])
 
     for k, v in tags.items():
         if v:
