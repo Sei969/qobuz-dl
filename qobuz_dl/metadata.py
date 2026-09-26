@@ -11,8 +11,8 @@ from qobuz_dl.utils import get_album_artist
 logger = logging.getLogger(__name__)
 
 
-# unicode symbols
-COPYRIGHT, PHON_COPYRIGHT = "\u2117", "\u00a9"
+# unicode symbols: (C) -> \u00a9 (copyright), (P) -> \u2117 (sound recording copyright)
+COPYRIGHT, PHON_COPYRIGHT = "\u00a9", "\u2117"
 # if a metadata block exceeds this, mutagen will raise error
 # and the file won't be tagged
 FLAC_MAX_BLOCKSIZE = 16777215
@@ -22,7 +22,6 @@ ID3_LEGEND = {
     "album": id3.TALB,
     "artist": id3.TPE1,
     "title": id3.TIT2,
-    "date": id3.TDAT,
     "mediatype": id3.TMED,
     "genre": id3.TCON,
     "composer": id3.TCOM,
@@ -35,8 +34,10 @@ ID3_LEGEND = {
     "year": id3.TYER,
     "performer": id3.TOPE,
     # --- DB SYNC FEATURE: CUSTOM QOBUZ IDS ---
-    "QOBUZ TRACK ID": id3.TXXX,
-    "QOBUZ ALBUM ID": id3.TXXX,
+    # Keys as returned by _get_tags_to_add(); sync-playlist, --sync-db, the lyrics
+    # command and the .m3u matching read them back as TXXX:QOBUZTRACKID/QOBUZALBUMID
+    "QOBUZTRACKID": id3.TXXX,
+    "QOBUZALBUMID": id3.TXXX,
     "QOBUZ ALBUM URL": id3.TXXX,
     # --- REPLAYGAIN ---
     "replaygain_track_gain": id3.TXXX,
@@ -336,6 +337,13 @@ def tag_mp3(filename, root_dir, final_name, d, album, istrack=True, em_image=Fal
 
     tags = _get_tags_to_add(qobuz_album, qobuz_item, settings=settings)
 
+    # ID3v2.3 stores the year in TYER and only the day and month (DDMM) in TDAT
+    release_date = tags.pop("DATE", "") or ""
+    if release_date[:4].isdigit():
+        audio["TYER"] = id3.TYER(encoding=3, text=release_date[:4])
+        if release_date[5:7].isdigit() and release_date[8:10].isdigit():
+            audio["TDAT"] = id3.TDAT(encoding=3, text=release_date[8:10] + release_date[5:7])
+
     for k, v in tags.items():
         if v:
             id3tag = ID3_LEGEND.get(k.lower()) or ID3_LEGEND.get(k)
@@ -345,10 +353,17 @@ def tag_mp3(filename, root_dir, final_name, d, album, istrack=True, em_image=Fal
                 else:
                     audio[id3tag.__name__] = id3tag(encoding=3, text=v)
 
-    audio["TRCK"] = id3.TRCK(encoding=3,
-                             text=f'{str(qobuz_item.get("track_number", "1"))}/{str(qobuz_album.get("tracks_count", "1"))}')
-    audio["TPOS"] = id3.TPOS(encoding=3,
-                             text=f'{str(qobuz_item.get("media_number", "1"))}/{str(qobuz_album.get("media_count", "1"))}')
+    # "number/total", following the same tag flags as tag_flac()
+    if not settings.no_track_number_tag:
+        track = str(qobuz_item.get("track_number", "1"))
+        if not settings.no_track_total_tag:
+            track += f'/{str(qobuz_album.get("tracks_count", "1"))}'
+        audio["TRCK"] = id3.TRCK(encoding=3, text=track)
+    if not settings.no_disc_number_tag:
+        disc = str(qobuz_item.get("media_number", "1"))
+        if not settings.no_disc_total_tag:
+            disc += f'/{str(qobuz_album.get("media_count", "1"))}'
+        audio["TPOS"] = id3.TPOS(encoding=3, text=disc)
 
     if em_image:
         _embed_id3_img(root_dir, audio)
@@ -481,7 +496,7 @@ def _get_tags_to_add(qobuz_album: dict, qobuz_item : dict, settings: QobuzDLSett
                 final_genres.append(translated)
                 
         tags["GENRE"] = ", ".join(final_genres)
-    if not settings.no_label_tag:
+    if not settings.no_copyright_tag:
         tags["COPYRIGHT"] = _format_copyright(qobuz_album.get("copyright", "n/a"))
     if not settings.no_label_tag:
         tags["LABEL"] = re.sub(r'\s+',' ', qobuz_album.get("label", {}).get("name", ""))
