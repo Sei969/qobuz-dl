@@ -143,6 +143,23 @@ def _get_title(track_dict):
     return title
 
 
+def _disc_track_total(qobuz_album: dict, qobuz_item: dict) -> str:
+    """
+    Number of tracks on the item's disc, as TRACKTOTAL is defined per disc.
+
+    Falls back to the album's tracks_count for single-disc albums, single tracks,
+    playlists, or when the album's track list is incomplete.
+    """
+    total = qobuz_album.get("tracks_count") or 1
+    items = (qobuz_album.get("tracks") or {}).get("items") or []
+    if (qobuz_album.get("media_count") or 1) > 1 and len(items) == total:
+        disc = qobuz_item.get("media_number", 1)
+        on_disc = sum(1 for track in items if track.get("media_number", 1) == disc)
+        if on_disc:
+            return str(on_disc)
+    return str(total)
+
+
 def _format_copyright(s: str) -> str:
     """
     Replaces standard text copyright symbols with their Unicode equivalents.
@@ -276,7 +293,7 @@ def tag_flac(
     if not settings.no_track_number_tag:
         tags["TRACKNUMBER"] = str(qobuz_item.get("track_number", "1"))
     if not settings.no_track_total_tag:
-        tags["TRACKTOTAL"] = str(qobuz_album.get("tracks_count", "1"))
+        tags["TRACKTOTAL"] = _disc_track_total(qobuz_album, qobuz_item)
     if not settings.no_disc_number_tag:
         tags["DISCNUMBER"] = str(qobuz_item.get("media_number", "1"))
     if not settings.no_disc_total_tag:
@@ -357,7 +374,7 @@ def tag_mp3(filename, root_dir, final_name, d, album, istrack=True, em_image=Fal
     if not settings.no_track_number_tag:
         track = str(qobuz_item.get("track_number", "1"))
         if not settings.no_track_total_tag:
-            track += f'/{str(qobuz_album.get("tracks_count", "1"))}'
+            track += f'/{_disc_track_total(qobuz_album, qobuz_item)}'
         audio["TRCK"] = id3.TRCK(encoding=3, text=track)
     if not settings.no_disc_number_tag:
         disc = str(qobuz_item.get("media_number", "1"))
