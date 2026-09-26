@@ -340,9 +340,12 @@ class QobuzDL:
                 self.settings.multiple_disc_one_dir = True
             # ------------------------------------------------
 
+            # Items handed to the downloader, in the order of the listing (for the .m3u)
+            queued_items = []
+
             # Use enumerate to get the track number in the playlist (1, 2, 3...)
             for idx, item in enumerate(items, start=1):
-                
+
                 # --- NEW: ULTIMATE SMART RECONCILER (LAZY + HEURISTIC) ---
                 if getattr(self, 'allowed_release_types', None) and url_type == "artist":
                     try:
@@ -416,6 +419,7 @@ class QobuzDL:
                         logger.info(f"{YELLOW}[!] Skipped (Blacklisted): {display_name}{OFF}")
                         continue
 
+                queued_items.append(item)
                 self.download_from_id(
                     item["id"],
                     True if type_dict["iterable_key"] == "albums" else False,
@@ -431,7 +435,9 @@ class QobuzDL:
             # -------------------------------
 
             if url_type == "playlist" and not self.no_m3u_for_playlists:
-                make_m3u(new_path)
+                # The playlist files carry no position in their names, so the .m3u is
+                # ordered by matching them to the playlist tracks (as sync-playlist does)
+                make_m3u(new_path, queued_items)
         else:
             self.download_from_id(item_id, type_dict["album"])
 
@@ -865,4 +871,5 @@ class QobuzDL:
             self.settings.multiple_disc_one_dir = original_multi_disc_setting
 
         if not self.no_m3u_for_playlists:
-            make_m3u(pl_directory)
+            # Keep the order of the Last.fm playlist (the files are matched by track ID)
+            make_m3u(pl_directory, [{"id": t_id} for t_id in track_ids])
