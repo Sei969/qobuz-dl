@@ -93,8 +93,8 @@ def validate_config_formats(formats_to_check):
         "media_type", "format", "bit_depth", "sampling_rate", "album_version", 
         "version_tag", "disc_count", "track_count", "ExplicitFlag", "explicit", 
         "release_type", "tracktitle", "track_title", "track_title_base", 
-        "track_id", "track_artist", "track_composer", "track_number", 
-        "isrc", "version", "disc_number"
+        "track_id", "track_artist", "track_composer", "track_number",
+        "isrc", "version", "disc_number", "quality_tag", "albumartist"
     }
 
     has_errors = False
