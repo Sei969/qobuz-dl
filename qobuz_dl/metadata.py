@@ -489,7 +489,7 @@ def _get_tags_to_add(qobuz_album: dict, qobuz_item : dict, settings: QobuzDLSett
                 final_genres.append(translated)
                 
         tags["GENRE"] = ", ".join(final_genres)
-    if not settings.no_label_tag:
+    if not settings.no_copyright_tag:
         tags["COPYRIGHT"] = _format_copyright(qobuz_album.get("copyright", "n/a"))
     if not settings.no_label_tag:
         tags["LABEL"] = re.sub(r'\s+',' ', qobuz_album.get("label", {}).get("name", ""))
