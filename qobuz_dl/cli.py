@@ -530,7 +530,7 @@ def main():
         sync_client = Client(email, password, app_id, secrets, user_auth_token=token, force_english=force_english)
         
         # Path management
-        sync_dir = default_folder if arguments.sync_db == "DEFAULT" else arguments.sync_db
+        sync_dir = os.path.expanduser(default_folder if arguments.sync_db == "DEFAULT" else arguments.sync_db)
         
         if os.name == "nt":
             sync_dir = os.path.abspath(sync_dir)
