@@ -33,6 +33,7 @@ ID3_LEGEND = {
     "comment": id3.COMM,
     "year": id3.TYER,
     "performer": id3.TOPE,
+    "compilation": id3.TCMP,
     # --- DB SYNC FEATURE: CUSTOM QOBUZ IDS ---
     # Keys as returned by _get_tags_to_add(); sync-playlist, --sync-db, the lyrics
     # command and the .m3u matching read them back as TXXX:QOBUZTRACKID/QOBUZALBUMID
@@ -49,6 +50,10 @@ ID3_LEGEND = {
 }
 
 EMB_COVER_NAME = "embed_cover.jpg"
+
+# Album artist names Qobuz uses for compilations of various artists
+VARIOUS_ARTISTS = {"various artists", "various", "va", "artistes divers", "verschiedene interpreten",
+                   "varios artistas", "artisti vari", "vari"}
 
 LOCAL_GENRE_MAP = {
     # Elettronica & Dance
@@ -141,6 +146,12 @@ def _get_title(track_dict):
         title = f"{track_dict['work']}: {title}"
 
     return title
+
+
+def _is_various_artists(qobuz_album: dict) -> bool:
+    """True if the album artist is "Various Artists" (a compilation)."""
+    names = get_album_artist(qobuz_album) or []
+    return any(str(name).strip().casefold() in VARIOUS_ARTISTS for name in names)
 
 
 def _disc_track_total(qobuz_album: dict, qobuz_item: dict) -> str:
@@ -527,6 +538,10 @@ def _get_tags_to_add(qobuz_album: dict, qobuz_item : dict, settings: QobuzDLSett
         tags["MEDIATYPE"] = qobuz_album.get("product_type", "").upper()
     if not settings.no_explicit_tag:
         tags["ITUNESADVISORY"] = "1" if qobuz_item.get("parental_warning", False) else ""
+
+    # Compilation flag, so players can group compilations of various artists
+    if _is_various_artists(qobuz_album):
+        tags["COMPILATION"] = "1"
 
     # --- REPLAYGAIN TAGS ---
     if not getattr(settings, 'no_replaygain_tag', False):
