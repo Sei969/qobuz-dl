@@ -11,8 +11,8 @@ from qobuz_dl.utils import get_album_artist
 logger = logging.getLogger(__name__)
 
 
-# unicode symbols
-COPYRIGHT, PHON_COPYRIGHT = "\u2117", "\u00a9"
+# unicode symbols: (C) -> \u00a9 (copyright), (P) -> \u2117 (sound recording copyright)
+COPYRIGHT, PHON_COPYRIGHT = "\u00a9", "\u2117"
 # if a metadata block exceeds this, mutagen will raise error
 # and the file won't be tagged
 FLAC_MAX_BLOCKSIZE = 16777215
