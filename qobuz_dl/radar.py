@@ -1,4 +1,3 @@
-import os
 import configparser
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -8,12 +7,26 @@ from qobuz_dl.color import GREEN, YELLOW, RED, CYAN, OFF
 from qobuz_dl.utils import read_config_file
 
 def setup_client(config_path, config, section):
-    """Initializes the Qobuz client reading from the config file."""
+    """
+    Initializes the Qobuz client reading from the config file.
+
+    The token is read like in the main program: from the OS keyring (where it is
+    moved by default), or from config.ini when disable_keyring is set.
+    """
+    from qobuz_dl.cli import _keyring_load
+
     app_id = config.get(section, 'app_id')
-    secrets = config.get(section, 'secrets')
-    auth_token = config.get(section, 'auth_token')
-    email = config.get(section, 'email', fallback="") or None
-    pwd = config.get(section, 'password', fallback="") or None
+    secrets = [s for s in config.get(section, 'secrets', fallback="").split(",") if s]
+    email = config.get(section, 'email', fallback="")
+    ini_token = config.get(section, 'auth_token', fallback="")
+    ini_password = config.get(section, 'password', fallback="")
+    disable_keyring = config.get(section, 'disable_keyring', fallback="false").strip().lower() in ['true', 'yes', 'y', '1']
+
+    if disable_keyring:
+        auth_token = ini_token or ini_password
+    else:
+        auth_token = _keyring_load("auth_token") or ini_token
+    pwd = auth_token or ini_password
 
     api = Client(email, pwd, user_auth_token=auth_token, app_id=app_id, secrets=secrets)
     api.auth_token = auth_token
@@ -63,18 +76,22 @@ def fetch_rss_releases(rss_url):
         print(f"{RED}[!] Error reading RSS feed: {e}{OFF}")
         return []
 
-def run_radar():
-    """Main execution function for the radar command."""
-    appdata_path = os.getenv('APPDATA')
-    config_path = os.path.join(appdata_path, 'qobuz-dl', 'config.ini')
-    
-    config = configparser.ConfigParser()
+
+def run_radar(config_path):
+    """
+    Main execution function for the radar command.
+
+    Args:
+        config_path (str): Path to config.ini, the same file the main program uses.
+    """
+    # No interpolation, like the main program: values such as RSS links may contain "%"
+    config = configparser.ConfigParser(interpolation=None)
     read_config_file(config, config_path)
     if not config.sections():
         print(f"{RED}[!] config.ini file not found at {config_path}{OFF}")
         return
-        
-    section = config.sections()[0]
+
+    section = "qobuz" if config.has_section("qobuz") else config.sections()[0]
     
     # 1. RSS Link Management
     rss_url = get_or_save_rss_link(config_path, config, section)

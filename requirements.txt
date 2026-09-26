@@ -7,3 +7,4 @@ beautifulsoup4
 colorama
 cryptography
 keyring
+questionary
