@@ -233,7 +233,8 @@ class QobuzDL:
         try:
             url_type, item_id = get_url_info(url)
             type_dict = possibles[url_type]
-        except (KeyError, IndexError):
+        except (KeyError, IndexError, AttributeError):
+            # AttributeError: get_url_info() found no known URL pattern
             logger.info(
                 f'{RED}Invalid url: "{url}". Use urls from ' "https://play.qobuz.com!"
             )
