@@ -93,8 +93,8 @@ def validate_config_formats(formats_to_check):
         "media_type", "format", "bit_depth", "sampling_rate", "album_version", 
         "version_tag", "disc_count", "track_count", "ExplicitFlag", "explicit", 
         "release_type", "tracktitle", "track_title", "track_title_base", 
-        "track_id", "track_artist", "track_composer", "track_number", 
-        "isrc", "version", "disc_number"
+        "track_id", "track_artist", "track_composer", "track_number",
+        "isrc", "version", "disc_number", "quality_tag", "albumartist"
     }
 
     has_errors = False
@@ -382,7 +382,7 @@ def main():
         from qobuz_dl.radar import run_radar
         
         try:
-            run_radar()
+            run_radar(CONFIG_FILE)
         except KeyboardInterrupt:
             print("\n\n\033[91m[!] Radar manually interrupted by the user (CTRL+C).\033[0m")
         sys.exit(0)
@@ -490,7 +490,8 @@ def main():
             fetch_lyrics = False
             
         force_english = not getattr(arguments, 'native_lang', False)
-        no_credits_flag = getattr(arguments, 'no_credits', False) or no_credits_config 
+        # --with-credits overrides no_credits = true from config.ini
+        no_credits_flag = (getattr(arguments, 'no_credits', False) or no_credits_config) and not getattr(arguments, 'with_credits', False)
         
     except (configparser.Error, KeyError) as error:
         arguments = qobuz_dl_args().parse_args()
@@ -522,6 +523,7 @@ def main():
 
     # --- NEW DB SYNC FEATURE (Lightweight Mode) ---
     if getattr(arguments, 'sync_db', None):
+        from qobuz_dl.db import create_db
         from qobuz_dl.sync import sync_database
         from qobuz_dl.qopy import Client
                 
@@ -529,14 +531,19 @@ def main():
         sync_client = Client(email, password, app_id, secrets, user_auth_token=token, force_english=force_english)
         
         # Path management
-        sync_dir = default_folder if arguments.sync_db == "DEFAULT" else arguments.sync_db
+        sync_dir = os.path.expanduser(default_folder if arguments.sync_db == "DEFAULT" else arguments.sync_db)
         
         if os.name == "nt":
             sync_dir = os.path.abspath(sync_dir)
             if not sync_dir.startswith("\\\\?\\"):
                 sync_dir = "\\\\?\\" + sync_dir
                 
-        sync_database(sync_dir, QOBUZ_DB, sync_client)
+        # Record the entries with the usual quality: downloads look them up by ID and quality
+        sync_quality = int(default_quality) if str(default_quality).strip().isdigit() else 27
+        # The downloads table is otherwise only created when the downloader starts, so on
+        # a fresh (or lost) database there would be nothing to write the entries into
+        create_db(QOBUZ_DB)
+        sync_database(sync_dir, QOBUZ_DB, sync_client, quality=sync_quality)
         sys.exit(f"\n{GREEN}Database synchronization finished successfully.{OFF}")
     # ----------------------------------------------
 
@@ -618,7 +625,7 @@ def main():
         track_format=arguments.track_format or track_format,
         smart_discography=arguments.smart_discography or smart_discography,
         fetch_lyrics=fetch_lyrics,
-        no_lrc_files=("--no-lrc-files" in sys.argv) or no_lrc_files_config,
+        no_lrc_files=not getattr(arguments, 'lrc_files', True) or no_lrc_files_config,
         genius_token=genius_token,
         force_english=force_english,
         no_credits=no_credits_flag,

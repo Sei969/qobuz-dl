@@ -165,7 +165,8 @@ class QobuzDLSettings:
             # user_auth_token
             'user_auth_token': config.get(section, "user_auth_token", fallback=""),
         
-            'lrc_files': not getattr(arguments, 'no_lrc_files', config.getboolean(section, "no_lrc_files", fallback=False)),
+            # --no-lrc-files stores False in arguments.lrc_files (it is absent without the flag)
+            'lrc_files': getattr(arguments, 'lrc_files', not config.getboolean(section, "no_lrc_files", fallback=False)),
         
             'embed_lyrics': False if getattr(arguments, 'no_embed_lyrics', False) else config.getboolean(section, "embed_lyrics", fallback=True),
         
