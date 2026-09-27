@@ -1,4 +1,5 @@
 from .lyrics_engine import LyricsEngine
+import errno
 import logging
 import os
 import time
@@ -63,6 +64,78 @@ def format_release_type(release_type: str) -> str:
     return release_type.title()
 # --------------------------------------------------------
 
+
+# --- FILE SYSTEM NAME LENGTH LIMIT ---
+# Smart truncation counts characters, but Linux and macOS limit a name to 255 bytes.
+# Titles in scripts that take 2-4 bytes per character in UTF-8 (CJK, Cyrillic, ...)
+# can exceed it, so names the file system refuses are shortened further.
+NAME_MAX_BYTES = 255
+STATE_PREFIX_BYTES = len("[IN PROGRESS] ".encode("utf-8"))
+
+
+def _is_name_too_long(parent, name):
+    """
+    Checks whether the file system refuses a file or folder name as too long.
+
+    The name is only looked up in the nearest existing folder, so nothing is
+    created. File systems that accept the name (e.g. Windows) are left alone.
+
+    Args:
+        parent (str): The folder that will contain the name (it may not exist yet).
+        name (str): The file or folder name.
+
+    Returns:
+        bool: True if the file system reports the name as too long.
+    """
+    while parent and not os.path.isdir(parent):
+        up = os.path.dirname(parent)
+        if up == parent:
+            break
+        parent = up
+    try:
+        os.stat(os.path.join(parent, name))
+    except OSError as e:
+        return e.errno == errno.ENAMETOOLONG
+    return False
+
+
+def _shorten_utf8(name, max_bytes):
+    """Shortens `name` in the middle with "..." until it fits in `max_bytes` bytes of UTF-8."""
+    if len(name.encode("utf-8")) <= max_bytes:
+        return name
+    for keep in range(len(name) - 1, -1, -1):
+        head = name[:(keep + 1) // 2].rstrip(' ."-_\'')
+        tail = name[len(name) - keep // 2:].lstrip(' ."-_\'')
+        short = f"{head}...{tail}"
+        if len(short.encode("utf-8")) <= max_bytes:
+            return short
+    return "..."
+
+
+def _fit_name(parent, name, suffix="", reserve=0):
+    """
+    Returns `name` + `suffix` as it is if the file system accepts it, otherwise with
+    `name` shortened in the middle until it is accepted.
+
+    Args:
+        parent (str): The folder that will contain the name.
+        name (str): The part of the name that may be shortened.
+        suffix (str, optional): A part kept as it is, e.g. the file extension.
+        reserve (int, optional): Bytes to leave free when shortening, e.g. for a prefix.
+
+    Returns:
+        str: The name to use.
+    """
+    if not _is_name_too_long(parent, name + suffix):
+        return name + suffix
+    max_bytes = NAME_MAX_BYTES - reserve
+    while True:
+        short = _shorten_utf8(name, max_bytes - len(suffix.encode("utf-8")))
+        if max_bytes <= 64 or not _is_name_too_long(parent, short + suffix):
+            return short + suffix
+        max_bytes -= 16
+# -------------------------------------
+
 def process_folder_format_with_subdirs(folder_format, attr_dict, path=None, legacy_charmap=False, disable_truncation=False):
     """
     Parses and sanitizes the user's custom folder format string, generating a safe directory path.
@@ -106,7 +179,15 @@ def process_folder_format_with_subdirs(folder_format, attr_dict, path=None, lega
                     
                 if cleaned_part:
                     cleaned_parts.append(cleaned_part)
-    
+
+    if path is not None:
+        # Parts the file system refuses as too long are shortened, keeping room for the
+        # "[IN PROGRESS] " prefix of album folders; all other parts stay as they are
+        parent = path
+        for i, part in enumerate(cleaned_parts):
+            cleaned_parts[i] = _fit_name(parent, part, reserve=STATE_PREFIX_BYTES)
+            parent = os.path.join(parent, cleaned_parts[i])
+
     final_path = os.path.join(*cleaned_parts) if cleaned_parts else ""
     if path is not None:
         return os.path.join(path, final_path)
@@ -306,7 +387,12 @@ class Download:
         inprogress_dirn = os.path.join(base_path, f"[IN PROGRESS] {folder_name}")
         
         is_standard_album = not getattr(self, 'is_playlist', False)
-        
+
+        # A folder name that only fits without the "[IN PROGRESS] " prefix is used as it is,
+        # the same way as when renaming the folder fails
+        if is_standard_album and _is_name_too_long(base_path, os.path.basename(inprogress_dirn)):
+            is_standard_album = False
+
         if is_standard_album:
             working_dirn = inprogress_dirn
             try:
@@ -662,7 +748,9 @@ class Download:
             end_part = formatted_path[-60:].lstrip(' ."-_\'')
             formatted_path = f"{start_part}...{end_part}"
             
-        final_file = os.path.join(root_dir, formatted_path) + extension
+        # The file name is shortened further only if the file system refuses it as too long
+        final_dir, final_name = os.path.split(os.path.join(root_dir, formatted_path))
+        final_file = os.path.join(final_dir, _fit_name(final_dir, final_name, extension))
 
         if os.path.exists(final_file):
             safe_print(f"{CYAN}[*] Skipping: {os.path.basename(final_file)} (Already exists){OFF}")
@@ -702,7 +790,8 @@ class Download:
         except ValueError:
             start_idx = 0
             
-        qualities_to_try = FALLBACK_TIERS[start_idx:]
+        # With --no-fallback a track is saved in the requested quality or not at all
+        qualities_to_try = FALLBACK_TIERS[start_idx:] if self.downgrade_quality else [int(self.quality)]
         success = False
         final_fmt = int(self.quality)
 
@@ -749,8 +838,15 @@ class Download:
         if abort_event.is_set():
             return False
 
+        # Use the format the server actually delivered (e.g. MP3 after falling back from
+        # lossless), and give the file the matching extension instead of the requested one
+        try:
+            final_fmt = int(fresh_track_dict.get("format_id") or final_fmt)
+        except (TypeError, ValueError):
+            pass
         is_mp3 = True if final_fmt == 5 else False
         extension = ".mp3" if is_mp3 else ".flac"
+        final_file = os.path.splitext(final_file)[0] + extension
 
         tag_function = metadata.tag_mp3 if is_mp3 else metadata.tag_flac
         try:
@@ -760,6 +856,9 @@ class Download:
             )
         except Exception as e:
             safe_print(f"{RED}[!] Error tagging: {e}{OFF}")
+            # The audio is left in the temporary file, which is removed at the end of the
+            # run, so the track failed: the album stays [INCOMPLETE] and is retried next time
+            return False
 
         if getattr(self, 'fetch_lyrics', False) and hasattr(self, 'lyrics_engine') and not abort_event.is_set():
             album_artist = _safe_get(track_metadata, "album", "artist", "name")
@@ -1018,9 +1117,9 @@ class Download:
         
         if self.no_credits or abort_event.is_set():
             return
-        
+
         safe_title = sanitize_filename(album_title)
-        tracklist_path = os.path.join(dirn, f"{safe_title} - Tracklist.txt")
+        tracklist_path = os.path.join(dirn, _fit_name(dirn, safe_title, " - Tracklist.txt"))
         
         if os.path.isfile(tracklist_path):
             return
@@ -1097,9 +1196,9 @@ class Download:
         """Reads downloaded .lrc files, strips timecodes, and appends the raw text to the booklet."""
         import re
         if abort_event.is_set(): return
-        
+
         safe_title = sanitize_filename(album_title)
-        tracklist_path = os.path.join(dirn, f"{safe_title} - Tracklist.txt")
+        tracklist_path = os.path.join(dirn, _fit_name(dirn, safe_title, " - Tracklist.txt"))
         if not os.path.isfile(tracklist_path): return
             
         audio_files = []
