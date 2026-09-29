@@ -480,7 +480,7 @@ class Download:
                         failed_tracks += 1
                         continue
 
-                    if "sample" not in parse and parse["sampling_rate"]:
+                    if parse:
                         is_mp3 = True if int(self.quality) == 5 else False
                         futures.append(
                             executor.submit(
@@ -575,7 +575,7 @@ class Download:
         Handles the download sequence for a standalone single track.
         """
         parse = self.client.get_track_url(self.item_id, self.quality)
-        if "sample" not in parse and parse["sampling_rate"]:
+        if parse:
             track_meta = self.client.get_track_meta(self.item_id)
             
             if getattr(self, 'is_playlist', False) and not getattr(self, 'playlist_as_albums', False) and getattr(self, 'playlist_track_number', None):
@@ -760,12 +760,7 @@ class Download:
             return False
 
         time.sleep(1)
-        try:
-            url = track_url_dict["url"]
-        except KeyError:
-            logger.info(f"{OFF}Track not available for download")
-            return False
-
+        
         total_discs = album_or_track_metadata.get('media_count', 1)
         if multiple and total_discs > 1 and (not self.settings.multiple_disc_one_dir):
             try:
@@ -807,6 +802,10 @@ class Download:
 
             try:
                 fresh_track_dict = get_fresh_url(force_segments=False)
+                
+                # Se la qualità corrente restituisce un sample, salta al tier inferiore
+                if fresh_track_dict.get("sample", False):
+                    continue
                 
                 if "url" in fresh_track_dict:
                     try:
