@@ -50,10 +50,6 @@ ID3_LEGEND = {
 }
 
 EMB_COVER_NAME = "embed_cover.jpg"
-
-# Album artist names Qobuz uses for compilations of various artists
-VARIOUS_ARTISTS = {"various artists", "various", "va", "artistes divers", "verschiedene interpreten",
-                   "varios artistas", "artisti vari", "vari"}
 # Primary release types in the MusicBrainz sense, as Navidrome and Picard read RELEASETYPE
 PRIMARY_RELEASE_TYPES = ("album", "single", "ep")
 
@@ -150,13 +146,20 @@ def _get_title(track_dict):
     return title
 
 
-def _is_various_artists(qobuz_album: dict) -> bool:
-    """True if the album artist is "Various Artists" (a compilation)."""
+def _various_artists_aliases(settings) -> set:
+    """Album artist names that mark a compilation, from config.ini (various_artists_aliases)."""
+    if settings is not None:
+        return settings.various_artists_aliases
+    return QobuzDLSettings().various_artists_aliases
+
+
+def _is_various_artists(qobuz_album: dict, aliases: set) -> bool:
+    """True if the album artist is one of the "Various Artists" aliases (a compilation)."""
     names = get_album_artist(qobuz_album) or []
-    return any(str(name).strip().casefold() in VARIOUS_ARTISTS for name in names)
+    return any(str(name).strip().casefold() in aliases for name in names)
 
 
-def _release_types(qobuz_album: dict) -> list:
+def _release_types(qobuz_album: dict, aliases: set) -> list:
     """
     Release types for the RELEASETYPE tag, MusicBrainz style: the primary type
     (album, single or ep) followed by "compilation" for compilations.
@@ -166,7 +169,7 @@ def _release_types(qobuz_album: dict) -> list:
     """
     raw = str(qobuz_album.get("release_type") or qobuz_album.get("product_type") or "").lower()
     types = [raw] if raw in PRIMARY_RELEASE_TYPES else []
-    if raw == "compilation" or _is_various_artists(qobuz_album):
+    if raw == "compilation" or _is_various_artists(qobuz_album, aliases):
         types = (types or ["album"]) + ["compilation"]
     return types
 
@@ -563,9 +566,10 @@ def _get_tags_to_add(qobuz_album: dict, qobuz_item : dict, settings: QobuzDLSett
 
     # Compilation flag and release type, so players can group compilations and
     # tell singles and EPs from albums
-    if _is_various_artists(qobuz_album):
+    aliases = _various_artists_aliases(settings)
+    if _is_various_artists(qobuz_album, aliases):
         tags["COMPILATION"] = "1"
-    release_types = _release_types(qobuz_album)
+    release_types = _release_types(qobuz_album, aliases)
     if release_types:
         tags["RELEASETYPE"] = release_types
 

@@ -1,4 +1,4 @@
-from qobuz_dl.constants import DEFAULT_FOLDER, DEFAULT_TRACK, DEFAULT_MULTIPLE_DISC_TRACK
+from qobuz_dl.constants import DEFAULT_FOLDER, DEFAULT_TRACK, DEFAULT_MULTIPLE_DISC_TRACK, DEFAULT_VARIOUS_ARTISTS_ALIASES
 
 class QobuzDLSettings:
     """
@@ -62,6 +62,9 @@ class QobuzDLSettings:
         self.embed_lyrics = kwargs.get('embed_lyrics', True)
         self.multi_value_tags = kwargs.get('multi_value_tags', False)
         self.disable_smart_truncation = kwargs.get('disable_smart_truncation', False)
+        self.various_artists_aliases = self.parse_aliases(
+            kwargs.get('various_artists_aliases', DEFAULT_VARIOUS_ARTISTS_ALIASES)
+        )
         
 
         # cover options
@@ -87,6 +90,21 @@ class QobuzDLSettings:
 
         # Seconds to wait between track (and album) downloads; > 0 also disables multithreading
         self.delay = max(0, int(kwargs.get('delay') or 0))
+
+    @staticmethod
+    def parse_aliases(value):
+        """
+        Turns a comma-separated list of names (as written in config.ini) into a set of
+        lower-case names for case-insensitive matching.
+
+        Args:
+            value (str | iterable): e.g. "various artists, va, artisti vari".
+
+        Returns:
+            set: e.g. {"various artists", "va", "artisti vari"}.
+        """
+        items = value.split(",") if isinstance(value, str) else (value or [])
+        return {str(item).strip().casefold() for item in items if str(item).strip()}
 
     @staticmethod
     def from_arguments_configparser(arguments, config):
@@ -134,6 +152,9 @@ class QobuzDLSettings:
             'multiple_disc_prefix': arguments.multiple_disc_prefix or config.get(section, "multiple_disc_prefix", fallback="CD"),
             'multiple_disc_one_dir': arguments.multiple_disc_one_dir or config.getboolean(section, "multiple_disc_one_dir", fallback=False),
             'multiple_disc_track_format': arguments.multiple_disc_track_format or config.get(section, "multiple_disc_track_format", fallback="{disc_number}.{track_number} - {track_title}"),
+
+            # album artist names that mark a compilation of various artists
+            'various_artists_aliases': config.get(section, "various_artists_aliases", fallback=DEFAULT_VARIOUS_ARTISTS_ALIASES),
                                  
             # tag options
             'no_album_artist_tag': arguments.no_album_artist_tag or config.getboolean(section, "no_album_artist_tag", fallback=False),
