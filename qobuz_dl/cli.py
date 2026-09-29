@@ -17,6 +17,7 @@ from qobuz_dl.color import GREEN, RED, YELLOW, OFF, CYAN
 from qobuz_dl.commands import qobuz_dl_args
 from qobuz_dl.core import QobuzDL
 from qobuz_dl.downloader import DEFAULT_FOLDER, DEFAULT_TRACK
+from qobuz_dl.constants import DEFAULT_VARIOUS_ARTISTS_ALIASES
 from qobuz_dl.settings import QobuzDLSettings
 from qobuz_dl.utils import read_config_file
 
@@ -258,6 +259,9 @@ def _reset_config(config_file):
     config["qobuz"]["multiple_disc_prefix"] = "CD"
     config["qobuz"]["multiple_disc_one_dir"] = "false"
     config["qobuz"]["multiple_disc_track_format"] = "{disc_number}.{track_number} - {track_title}"
+
+    # Album artist names that mark a compilation (COMPILATION=1); add names in your language
+    config["qobuz"]["various_artists_aliases"] = DEFAULT_VARIOUS_ARTISTS_ALIASES
     
     config["qobuz"]["max_workers"] = "3"
     config["qobuz"]["user_auth_token"] = ""

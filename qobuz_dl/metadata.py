@@ -33,6 +33,7 @@ ID3_LEGEND = {
     "comment": id3.COMM,
     "year": id3.TYER,
     "performer": id3.TOPE,
+    "compilation": id3.TCMP,
     # --- DB SYNC FEATURE: CUSTOM QOBUZ IDS ---
     # Keys as returned by _get_tags_to_add(); sync-playlist, --sync-db, the lyrics
     # command and the .m3u matching read them back as TXXX:QOBUZTRACKID/QOBUZALBUMID
@@ -49,6 +50,8 @@ ID3_LEGEND = {
 }
 
 EMB_COVER_NAME = "embed_cover.jpg"
+# Primary release types in the MusicBrainz sense, as Navidrome and Picard read RELEASETYPE
+PRIMARY_RELEASE_TYPES = ("album", "single", "ep")
 
 LOCAL_GENRE_MAP = {
     # Elettronica & Dance
@@ -141,6 +144,51 @@ def _get_title(track_dict):
         title = f"{track_dict['work']}: {title}"
 
     return title
+
+
+def _various_artists_aliases(settings) -> set:
+    """Album artist names that mark a compilation, from config.ini (various_artists_aliases)."""
+    if settings is not None:
+        return settings.various_artists_aliases
+    return QobuzDLSettings().various_artists_aliases
+
+
+def _is_various_artists(qobuz_album: dict, aliases: set) -> bool:
+    """True if the album artist is one of the "Various Artists" aliases (a compilation)."""
+    names = get_album_artist(qobuz_album) or []
+    return any(str(name).strip().casefold() in aliases for name in names)
+
+
+def _release_types(qobuz_album: dict, aliases: set) -> list:
+    """
+    Release types for the RELEASETYPE tag, MusicBrainz style: the primary type
+    (album, single or ep) followed by "compilation" for compilations.
+
+    Returns:
+        list: e.g. ["album"] or ["album", "compilation"]; empty if Qobuz gives no type.
+    """
+    raw = str(qobuz_album.get("release_type") or qobuz_album.get("product_type") or "").lower()
+    types = [raw] if raw in PRIMARY_RELEASE_TYPES else []
+    if raw == "compilation" or _is_various_artists(qobuz_album, aliases):
+        types = (types or ["album"]) + ["compilation"]
+    return types
+
+
+def _disc_track_total(qobuz_album: dict, qobuz_item: dict) -> str:
+    """
+    Number of tracks on the item's disc, as TRACKTOTAL is defined per disc.
+
+    Falls back to the album's tracks_count for single-disc albums, single tracks,
+    playlists, or when the album's track list is incomplete.
+    """
+    total = qobuz_album.get("tracks_count") or 1
+    items = (qobuz_album.get("tracks") or {}).get("items") or []
+    if (qobuz_album.get("media_count") or 1) > 1 and len(items) == total:
+        disc = qobuz_item.get("media_number", 1)
+        on_disc = sum(1 for track in items if track.get("media_number", 1) == disc)
+        if on_disc:
+            return str(on_disc)
+    return str(total)
 
 
 def _format_copyright(s: str) -> str:
@@ -276,7 +324,7 @@ def tag_flac(
     if not settings.no_track_number_tag:
         tags["TRACKNUMBER"] = str(qobuz_item.get("track_number", "1"))
     if not settings.no_track_total_tag:
-        tags["TRACKTOTAL"] = str(qobuz_album.get("tracks_count", "1"))
+        tags["TRACKTOTAL"] = _disc_track_total(qobuz_album, qobuz_item)
     if not settings.no_disc_number_tag:
         tags["DISCNUMBER"] = str(qobuz_item.get("media_number", "1"))
     if not settings.no_disc_total_tag:
@@ -344,6 +392,11 @@ def tag_mp3(filename, root_dir, final_name, d, album, istrack=True, em_image=Fal
         if release_date[5:7].isdigit() and release_date[8:10].isdigit():
             audio["TDAT"] = id3.TDAT(encoding=3, text=release_date[8:10] + release_date[5:7])
 
+    # Navidrome and Picard read the release type of MP3 files from this frame
+    release_types = tags.pop("RELEASETYPE", None)
+    if release_types:
+        audio.add(id3.TXXX(encoding=3, desc="MusicBrainz Album Type", text=",".join(release_types)))
+
     for k, v in tags.items():
         if v:
             id3tag = ID3_LEGEND.get(k.lower()) or ID3_LEGEND.get(k)
@@ -357,7 +410,7 @@ def tag_mp3(filename, root_dir, final_name, d, album, istrack=True, em_image=Fal
     if not settings.no_track_number_tag:
         track = str(qobuz_item.get("track_number", "1"))
         if not settings.no_track_total_tag:
-            track += f'/{str(qobuz_album.get("tracks_count", "1"))}'
+            track += f'/{_disc_track_total(qobuz_album, qobuz_item)}'
         audio["TRCK"] = id3.TRCK(encoding=3, text=track)
     if not settings.no_disc_number_tag:
         disc = str(qobuz_item.get("media_number", "1"))
@@ -510,6 +563,15 @@ def _get_tags_to_add(qobuz_album: dict, qobuz_item : dict, settings: QobuzDLSett
         tags["MEDIATYPE"] = qobuz_album.get("product_type", "").upper()
     if not settings.no_explicit_tag:
         tags["ITUNESADVISORY"] = "1" if qobuz_item.get("parental_warning", False) else ""
+
+    # Compilation flag and release type, so players can group compilations and
+    # tell singles and EPs from albums
+    aliases = _various_artists_aliases(settings)
+    if _is_various_artists(qobuz_album, aliases):
+        tags["COMPILATION"] = "1"
+    release_types = _release_types(qobuz_album, aliases)
+    if release_types:
+        tags["RELEASETYPE"] = release_types
 
     # --- REPLAYGAIN TAGS ---
     if not getattr(settings, 'no_replaygain_tag', False):

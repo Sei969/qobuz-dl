@@ -175,6 +175,10 @@ no_album_url_tag = true
 no_conductor_tag = true
 no_ensemble_tag = true
 no_work_tag = true
+
+# Album artist names that mark a compilation (tagged COMPILATION=1, RELEASETYPE compilation).
+# Case-insensitive, comma-separated: add the name Qobuz uses in your language
+various_artists_aliases = various artists, various, va, artistes divers, verschiedene interpreten, varios artistas, artisti vari, vari
 ```
 *(Note: If you are upgrading from an older version, the legacy `default_folder` key is still fully supported for backward compatibility.)*
 
