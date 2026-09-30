@@ -1297,6 +1297,13 @@ def tqdm_download(url_or_callable, fname, track_name, is_parallel=False):
                 if r.status_code not in [200, 206]:
                     raise Exception(f"Status Server: {r.status_code}")
 
+                if downloaded_size > 0 and r.status_code == 200:
+                    # The server ignored the Range header and sent the whole file again:
+                    # start over instead of appending it to the part already saved
+                    downloaded_size = 0
+                    total_size = 0
+                    mode = 'wb'
+
                 if total_size == 0:
                     total_size = downloaded_size + int(r.headers.get('content-length', 0))
 
@@ -1316,6 +1323,9 @@ def tqdm_download(url_or_callable, fname, track_name, is_parallel=False):
                             if not is_parallel:
                                 bar.update(size)
             
+            if downloaded_size > total_size > 0:
+                if os.path.exists(fname): os.remove(fname)
+                raise Exception(f"Downloaded {downloaded_size} bytes, but the server announced {total_size}")
             if downloaded_size >= total_size:
                 safe_print(f"{G}  L Completed: {track_name}{O}")
                 return 
