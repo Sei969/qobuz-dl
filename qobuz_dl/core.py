@@ -70,6 +70,7 @@ class QobuzDL:
         lucky_limit=1,
         lucky_type="album",
         interactive_limit=20,
+        interactive_sort_date=False,
         ignore_singles_eps=False,
         no_m3u_for_playlists=False,
         quality_fallback=True,
@@ -125,6 +126,7 @@ class QobuzDL:
         self.lucky_limit = lucky_limit
         self.lucky_type = lucky_type
         self.interactive_limit = interactive_limit
+        self.interactive_sort_date = interactive_sort_date
         self.ignore_singles_eps = ignore_singles_eps
         self.no_m3u_for_playlists = no_m3u_for_playlists
         self.quality_fallback = quality_fallback
@@ -616,6 +618,18 @@ class QobuzDL:
                 results = mode_dict["func"](query, limit)
                 iterable = results[mode_dict["key"]]["items"]
             # --------------------------------------------
+            # INTERACTIVE SORT BY DATE ---
+            # Sorts the parsed API iterable by release date (descending) before rendering the UI
+            if getattr(self, 'interactive_sort_date', False) and item_type in ["album", "track"]:
+                try:
+                    iterable = sorted(
+                        iterable,
+                        key=lambda x: str(x.get("release_date_original") or x.get("release_date") or "0000"),
+                        reverse=True
+                    )
+                except Exception as e:
+                    logger.debug(f"Sorting by date failed: {e}")
+            # -------------------------------------
             
             item_list = []
             

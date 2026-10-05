@@ -166,6 +166,9 @@ legacy_charmap = false
 # Set to 'true' to disable external .lrc file generation (lyrics will only be embedded in FLAC/MP3 tags)
 no_lrc_files = true
 
+# Set to 'true' to automatically sort interactive search results (Albums/Tracks) by release date descending
+interactive_sort_date = false
+
 # Set to 'true' to strictly disable ReplayGain volume tags for bit-perfect hardware playback
 no_replaygain_tag = true
 
@@ -293,11 +296,13 @@ Save multiple discs of a release in one single folder instead of splitting them.
 python -m qobuz_dl dl [https://play.qobuz.com/artist/2038380](https://play.qobuz.com/artist/2038380) --multiple-disc-one-dir
 ```
 
-**Interactive Last.fm Mode (Fun Mode):**
-*(Tip: In interactive mode, use `Space` to multi-select several albums to download at once!)*
+**Interactive Mode (Fun Mode) & Chronological Sorting:**
+Launch the interactive UI to browse the Qobuz catalog or your private Favorites directly from the terminal. Use `Space` to multi-select several albums to download at once.
+*(Tip: Add the `-sd` or `--sort-date` flag to automatically sort Albums and Tracks by release date, from newest to oldest!)*
 ```bash
-python -m qobuz_dl fun -l 10
+python -m qobuz_dl fun -sd -l 10
 ```
+
 **Audiophile Purist Mode (No ReplayGain):**
 Download a track keeping the file strictly bit-perfect without writing any volume-leveling tags (useful for hardware DSPs and DAPs).
 ```bash

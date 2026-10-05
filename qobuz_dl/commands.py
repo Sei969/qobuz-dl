@@ -28,6 +28,15 @@ def fun_args(subparsers, default_limit):
         default=default_limit,
         help="limit of search results (default: 20)",
     )
+    
+    interactive.add_argument(
+        "-sd",
+        "--sort-date",
+        dest="sort_date",
+        action="store_true",
+        help="sort interactive search results by release date descending (newest first)",
+    )
+        
     return interactive
 
 

@@ -478,6 +478,7 @@ def main():
         no_credits_config = config.getboolean(section, "no_credits", fallback=False)
         blacklist_config = config.get(section, "blacklist", fallback="blacklist.txt")
         playlist_as_albums_config = config.getboolean(section, "playlist_as_albums", fallback=False)
+        interactive_sort_date_config = config.getboolean(section, "interactive_sort_date", fallback=False)
         
         app_id = config.get(section, "app_id")
         secrets = [s for s in config.get(section, "secrets").split(",") if s]
@@ -619,6 +620,7 @@ def main():
         directory_to_use,
         arguments.quality,
         arguments.embed_art or embed_art,
+        interactive_sort_date=getattr(arguments, 'sort_date', False) or interactive_sort_date_config,
         ignore_singles_eps=arguments.albums_only or albums_only,
         no_m3u_for_playlists=arguments.no_m3u or no_m3u,
         quality_fallback=not (arguments.no_fallback or no_fallback),
