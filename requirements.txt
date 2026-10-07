@@ -8,3 +8,4 @@ colorama
 cryptography
 keyring
 questionary
+defusedxml

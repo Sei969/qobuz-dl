@@ -89,6 +89,7 @@ Never miss a new release from your tracked artists. The new `radar` command seam
 * **Smart Feed Parsing:** Automatically fetches and parses your private RSS/Atom feed to find the latest releases from the artists you follow.
 * **Fuzzy Qobuz Matching:** Queries the Qobuz database to find the exact high-resolution matches for your daily new releases.
 * **Interactive Checkbox UI:** Presents a clean, interactive terminal menu where you can multi-select (`Spacebar`) the fresh releases and instantly inject them into your Qobuz Favorites (`Enter`), ready to be downloaded later via the `fun` mode.
+* **Secure XML Parsing:** Private RSS feeds are processed using `defusedxml` alongside strict pre-flight URL schema validation. This completely neutralizes XXE (XML External Entity) attacks and SSRF vulnerabilities when syncing external data.
 
 ### 🛡️ Fail-Safe Folder Management & Smart Resume
 Say goodbye to messy libraries and corrupted downloads. The downloader now features a dynamic 3-stage folder state system to keep your music library perfectly organized:

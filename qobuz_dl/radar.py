@@ -1,6 +1,6 @@
 import configparser
 import urllib.request
-import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET
 import questionary
 from qobuz_dl.qopy import Client
 from qobuz_dl.color import GREEN, YELLOW, RED, CYAN, OFF
@@ -51,13 +51,24 @@ def get_or_save_rss_link(config_path, config, section):
     return rss_link
 
 def fetch_rss_releases(rss_url):
-    """Downloads and parses the RSS/Atom feed ignoring XML namespaces."""
+    """
+    Downloads and parses the RSS/Atom feed ignoring XML namespaces.
+    Includes a pre-flight security check to prevent SSRF and local file reads 
+    via non-HTTP schemes (e.g., file://, ftp://).
+    """
     print(f"{CYAN}[*] Syncing with MusicButler...{OFF}")
+    
+    # Pre-flight security validation: enforce HTTP/HTTPS protocol
+    if not rss_url.startswith(('http://', 'https://')):
+        print(f"{RED}[!] Security Error: Unsupported URL scheme. Only HTTP and HTTPS are allowed.{OFF}")
+        return []
+        
     try:
         req = urllib.request.Request(rss_url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
-        with urllib.request.urlopen(req) as response:
+        with urllib.request.urlopen(req) as response: # nosec
             xml_data = response.read()
             
+        # The XML parsing is now secured by the defusedxml drop-in replacement
         root = ET.fromstring(xml_data)
         releases = []
         

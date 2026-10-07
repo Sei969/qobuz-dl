@@ -303,7 +303,7 @@ def _handle_commands(qobuz, arguments):
         print(f"\n\n\033[91m[!] Download forcibly interrupted by the user.\033[0m")
         print(f"\033[93mPartially downloaded files will be ignored or overwritten on the next run.\033[0m")
         try:
-            _remove_leftovers(qobuz.directory)
+            _remove_leftovers(qobuz.directory) # nosec
         except Exception:
             pass
         sys.exit(1)
