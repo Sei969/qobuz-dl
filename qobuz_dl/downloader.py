@@ -932,6 +932,23 @@ class Download:
         album_artist_raw = get_album_artist(album_metadata)
         album_artist_str = _flatten_artists(album_artist_raw) if album_artist_raw else track_artist
 
+        # Disc number comes from the track's "media_number" (see metadata.tag_*); pad it
+        # so {disc_number} renders as "01" in multiple_disc_track_format
+        try:
+            media_number = int(track_metadata.get("media_number", 1) or 1)
+        except (ValueError, TypeError):
+            media_number = 1
+        disc_number = f"{media_number:02}"
+
+        album_tracks = album_metadata.get("tracks") or {}
+        track_items = album_tracks.get("items", []) if isinstance(album_tracks, dict) else []
+        if track_items:
+            track_count = str(sum(1 for t in track_items if t.get("media_number", 1) == media_number))
+        elif isinstance(album_tracks, dict) and album_tracks.get("total"):
+            track_count = str(album_tracks["total"])
+        else:
+            track_count = str(track_metadata.get("track_number", 0))
+
         return {
             "artist": track_artist,
             "albumartist": album_artist_str,
@@ -945,6 +962,9 @@ class Download:
             "track_artist": track_artist,
             "track_composer": _safe_get(track_metadata,"composer", "name"),
             "track_number": f'{track_metadata.get("track_number", 0):02}',
+            "disc_number": disc_number,
+            "disc_count": str(album_metadata.get("media_count", 1)),
+            "track_count": track_count,
             "isrc": track_metadata.get("isrc"),
             "bit_depth": track_metadata.get("maximum_bit_depth"),
             "sampling_rate": track_metadata.get("maximum_sampling_rate"),
@@ -969,6 +989,13 @@ class Download:
             
         album_artist_raw = get_album_artist(album_meta)
         album_artist_str = _flatten_artists(album_artist_raw) if album_artist_raw else _safe_get(meta, "performer", "name")
+
+        # Disc info lives on the track ("media_number") and its nested album
+        # ("media_count"/"track_count"), not on the track object itself
+        try:
+            media_number = int(meta.get("media_number", 1) or 1)
+        except (ValueError, TypeError):
+            media_number = 1
 
         return {
             "album": _get_title(album_meta),
@@ -997,8 +1024,9 @@ class Download:
             "quality_tag": "MP3" if str(file_format).upper() == "MP3" else (f"{file_format} {bit_depth}" if bit_depth else file_format),
             "album_version": meta.get("version", ""),
             "version_tag": f" - {meta.get('version')}" if meta.get("version") else "",
-            "disc_count": meta.get("media_count", ""),
-            "track_count": meta.get("track_count", ""),
+            "disc_number": f"{media_number:02}",
+            "disc_count": str(album_meta.get("media_count") or 1),
+            "track_count": str(album_meta.get("track_count") or ""),
             "ExplicitFlag": "[E]" if album_meta.get("parental_warning") else "",
             "explicit": "[E]" if album_meta.get("parental_warning") else "",
             "release_type": format_release_type(album_meta.get("release_type")),
