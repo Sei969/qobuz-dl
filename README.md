@@ -57,7 +57,7 @@ Qobuz-DL Ultimate allows deep customization of your library structure using vari
   * **Position-Independent Naming:** Audio files are saved cleanly (e.g., `Artist - Title.flac`) without hardcoded numerical prefixes. This industry-standard approach ensures that if a playlist changes order online, your local files are recognized instantly, preventing massive duplicate re-downloads.
   * **Smart API-Driven `.m3u`:** Playback order is guaranteed by a dynamically generated `.m3u` file that perfectly mirrors the exact sequence dictated by the Qobuz servers, regardless of the physical files' names.
   * **Smart Cover Management:** Eliminates the "Cover Conflict" bug. The engine dynamically manages embedded artwork, ensuring each track gets its correct unique cover without leaving duplicate `cover.jpg` files in the folder.
-  * **Album Mode Override (`--playlist-as-albums`):** *New feature.* If you use playlists to hunt for specific songs, this flag completely bypasses the Flat Folder logic. The engine will "explode" the playlist, routing each track into its respective original album folder using your standard `folder_format`, keeping the original track numbers, and downloading the specific cover art for each album.
+  * **Album Mode Override (`--playlist-as-albums`):** *New feature.* If you use playlists to hunt for specific songs, this flag completely bypasses the Flat Folder logic. The engine will "explode" the playlist, routing each track into its respective original album folder using your standard `folder_format`, keeping the original track numbers, and downloading the specific cover art for each album.Fully supported for both one-off downloads (dl) and bidirectional syncing (`sp`).
 * **Powerful Variables:** `folder_format` and `track_format` now support dozens of new variables (e.g., `{isrc}`, `{barcode}`, `{label}`, `{track_composer}`).
 * **Release Type (`{release_type}`):** Automatically identifies the publication category from Qobuz APIs (e.g., `Album`, `EP`, `Single`), allowing you to dynamically route downloads into subdirectories or use it as a naming prefix without enforcing a fixed structure.
   * *Folder Example (Subdirectory):* `folder_format = {release_type}/{album_artist} - {album_title}` ➔ `Album/Daft Punk - Discovery`
@@ -241,7 +241,7 @@ python -m qobuz_dl radar
 ```
 
 **Bidirectional Playlist Sync:**
-*(Tip: Add `-y` to bypass confirmation prompts. The `-d` flag acts securely, automatically creating a playlist subfolder).*
+*(Tip: Add `-y` to bypass confirmation prompts. The `-d` flag acts securely, automatically creating a playlist subfolder). Want to sync while keeping original album folders? Just append the `--playlist-as-albums` flag!)*
 ```bash
 python -m qobuz_dl sp "URL" -d "C:\Path\To\Local\Playlist\Folder"
 ```
@@ -360,6 +360,7 @@ The Ultimate Edition includes powerful local library managers to keep track of y
   ```bash
   python -m qobuz_dl sp "PLAYLIST_URL" -d "/path/to/your/local/folder"
   ```
+  *(Note: Fully supports the `--playlist-as-albums` flag if you want to maintain a strict album-based library structure during the sync!)*
 
 * **Retroactive Lyrics Tagger (`lyrics`):**
   Do you have an existing local music library that lacks synced lyrics? The `lyrics` command acts as a standalone metadata engine. It recursively scans any local directory and detects FLAC/MP3 files missing lyrics. It intelligently reads the hidden `QOBUZTRACKID` tags from your existing files to retroactively fetch and inject the **official native 1:1 Qobuz lyrics**. For files originating from other sources (e.g., CD rips), it gracefully falls back to LRCLIB and Genius APIs using the Fuzzy Matching algorithm, all without re-downloading any audio. 

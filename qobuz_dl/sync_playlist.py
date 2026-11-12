@@ -235,10 +235,14 @@ def sync_playlist(qobuz_dl, url, folder, auto_confirm=False):
 
     _clean_empty_dirs(target_folder, exclude_dirs={"_Playlists"})
 
-    original_folder_format = qobuz_dl.folder_format
-    original_multi_disc = qobuz_dl.settings.multiple_disc_one_dir
-    qobuz_dl.folder_format = "."
-    qobuz_dl.settings.multiple_disc_one_dir = True
+    # Check the flag before forcing Flat Folder structure
+    is_playlist_as_albums = getattr(qobuz_dl, 'playlist_as_albums', False)
+    
+    if not is_playlist_as_albums:
+        original_folder_format = qobuz_dl.folder_format
+        original_multi_disc = qobuz_dl.settings.multiple_disc_one_dir
+        qobuz_dl.folder_format = "."
+        qobuz_dl.settings.multiple_disc_one_dir = True
 
     position_map = {}
     for idx, item in enumerate(remote_items, start=1):
@@ -266,8 +270,9 @@ def sync_playlist(qobuz_dl, url, folder, auto_confirm=False):
         except Exception as e:
             logger.error(f"  {RED}[!] Failed to download track {tid}: {e}{OFF}")
 
-    qobuz_dl.folder_format = original_folder_format
-    qobuz_dl.settings.multiple_disc_one_dir = original_multi_disc
+    if not is_playlist_as_albums:
+        qobuz_dl.folder_format = original_folder_format
+        qobuz_dl.settings.multiple_disc_one_dir = original_multi_disc
 
     if not getattr(qobuz_dl, 'no_m3u_for_playlists', False):
         make_m3u(target_folder, remote_items)
