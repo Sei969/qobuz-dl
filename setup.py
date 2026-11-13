@@ -13,7 +13,7 @@ def get_version():
                     return line.split('"')[1]
     except Exception:
         pass
-    return "2.7.0"
+    return "2.7.1"
 
 def read_file(fname):
     # Added encoding="utf-8" to prevent build errors with emojis in README
@@ -25,14 +25,14 @@ requirements = [
     "requests",
     "mutagen",
     "tqdm",
-    "pick==1.6.0",
     "beautifulsoup4",
     "colorama",
     # NOTE: cryptography was used in the original downloader, keeping it for safety
     "cryptography",
     "keyring",
-    # used by the radar command
+    # used by the interactive menu and radar command
     "questionary",
+    "defusedxml",
 ]
 
 setup(

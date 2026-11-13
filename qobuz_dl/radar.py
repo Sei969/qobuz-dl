@@ -1,10 +1,26 @@
+import re
 import configparser
 import urllib.request
 import defusedxml.ElementTree as ET
 import questionary
+from prompt_toolkit.styles import Style
 from qobuz_dl.qopy import Client
 from qobuz_dl.color import GREEN, YELLOW, RED, CYAN, OFF
 from qobuz_dl.utils import read_config_file
+
+# --- UI STYLING FOR QUESTIONARY ---
+Q_STYLE = Style([
+    ("qmark", "fg:#00ffff bold"),
+    ("question", "bold"),
+    ("answer", "fg:#f44336 bold"),
+    ("pointer", "fg:#00ffff bold"),
+    ("highlighted", "fg:#00ffff bold"),
+    ("selected", "fg:#cc5454"),
+    ("separator", "fg:#cc5454"),
+    ("instruction", ""),
+    ("text", ""),
+])
+# ----------------------------------
 
 def setup_client(config_path, config, section):
     """
@@ -40,7 +56,10 @@ def get_or_save_rss_link(config_path, config, section):
             return rss_link
 
     print(f"{YELLOW}[!] No RSS feed found.{OFF}")
-    rss_link = questionary.text("Paste your private MusicButler RSS link here:").ask()
+    rss_link = questionary.text(
+        "Paste your private MusicButler RSS link here:",
+        style=Q_STYLE,
+    ).ask()
     
     if rss_link:
         config.set(section, 'musicbutler_rss', rss_link)
@@ -129,7 +148,14 @@ def run_radar(config_path):
     # 4. Search on Qobuz and prepare the UI menu
     choices = []
     for release_title in releases:
-        search_result = api.search_albums(release_title, limit=1)
+        # Strip MusicButler narrative verb ("released"/"announced") and quotes for accurate API search
+        clean_query = re.sub(
+            r'\s+(?:released|announced)\s+["“](.+?)["”]$',
+            r" \1",
+            release_title,
+            flags=re.IGNORECASE,
+        ).strip()
+        search_result = api.search_albums(clean_query, limit=1)
         
         if search_result and "albums" in search_result and search_result["albums"]["items"]:
             album_data = search_result["albums"]["items"][0]
@@ -151,7 +177,9 @@ def run_radar(config_path):
     print("\n")
     selected_album_ids = questionary.checkbox(
         "🎧 Select releases to add to Favorites (Space to select, Enter to confirm):",
-        choices=choices
+        choices=choices,
+        style=Q_STYLE,
+        instruction="",
     ).ask()
 
     if not selected_album_ids:
@@ -167,4 +195,25 @@ def run_radar(config_path):
         except Exception as e:
             print(f"{RED}  [-] Error with ID {album_id}: {e}{OFF}")
             
-    print(f"\n{GREEN}✅ Operation complete! You can now run qobuz-dl to download them.{OFF}")
+    print(f"\n{GREEN}✅ Favorites updated successfully!{OFF}\n")
+
+    # 7. Optional Immediate Download (delegates to main CLI to honor all config.ini settings)
+    download_now = questionary.select(
+        "Do you want to download the selected releases right now?",
+        choices=["Yes", "No"],
+        style=Q_STYLE,
+    ).ask()
+
+    if download_now == "Yes":
+        import sys
+        from qobuz_dl.cli import main as cli_main
+
+        album_urls = [
+            f"https://play.qobuz.com/album/{album_id}"
+            for album_id in selected_album_ids
+        ]
+        print(f"\n{CYAN}[*] Forwarding {len(album_urls)} release(s) to the download engine...{OFF}\n")
+        sys.argv = [sys.argv[0], "dl"] + album_urls
+        cli_main()
+    else:
+        print(f"{YELLOW}[*] Done! You can download them later via 'qobuz-dl fun' (Favorites).{OFF}")

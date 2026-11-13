@@ -176,11 +176,6 @@ def sync_playlist_args(subparsers):
         action="store_true",
         help="Skip confirmation prompt before deleting/downloading",
     )
-    sync_pl.add_argument(
-        "--playlist-as-albums",
-        action="store_true",
-        help="Download playlist items using standard album folder structures instead of a flat playlist directory",
-    )
     return sync_pl
 
 def add_common_arg(custom_parser, default_folder, default_quality):

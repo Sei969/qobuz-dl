@@ -4,6 +4,8 @@ import sys
 import re
 
 import requests
+import questionary
+from prompt_toolkit.styles import Style
 from pathvalidate import sanitize_filename
 
 from qobuz_dl.bundle import Bundle
@@ -22,23 +24,52 @@ from qobuz_dl.utils import (
 )
 from qobuz_dl.settings import QobuzDLSettings
 
+# --- UI STYLING FOR QUESTIONARY ---
+Q_STYLE = Style([
+    ("qmark", "fg:#00ffff bold"),
+    ("question", "bold"),
+    ("answer", "fg:#f44336 bold"),
+    ("pointer", "fg:#00ffff bold"),
+    ("highlighted", "fg:#00ffff bold"),
+    ("selected", "fg:#cc5454"),
+    ("separator", "fg:#cc5454"),
+    ("instruction", ""),
+    ("text", ""),
+])
+# ----------------------------------
+
+import unicodedata
+
 # --- UI TABLE FORMATTING HELPER ---
 def _align_text(text, width):
     """
-    Truncates text with '...' if it exceeds the specified width, 
-    or pads it with spaces to ensure perfect UI table alignment.
+    Truncates text with '...' if its terminal display width exceeds the specified width, 
+    or pads it with spaces to ensure perfect UI table alignment (including CJK characters).
 
     Args:
         text (str): The text to format.
-        width (int): The maximum character width.
+        width (int): The maximum terminal column width.
 
     Returns:
         str: The aligned and formatted string.
     """
     text = str(text)
-    if len(text) > width:
-        return text[:width - 3] + "..."
-    return text.ljust(width)
+
+    def _char_width(ch):
+        return 2 if unicodedata.east_asian_width(ch) in ("W", "F") else 1
+
+    disp_len = sum(_char_width(c) for c in text)
+    if disp_len > width:
+        out = []
+        cur = 0
+        for c in text:
+            w = _char_width(c)
+            if cur + w > width - 3:
+                break
+            out.append(c)
+            cur += w
+        return "".join(out) + "..." + " " * (width - cur - 3)
+    return text + " " * (width - disp_len)
 # ----------------------------------
 
 WEB_URL = "https://play.qobuz.com/"
@@ -310,8 +341,6 @@ class QobuzDL:
 
             # --- NEW: INTERACTIVE RELEASE TYPE FILTER (LAZY STATIC MENU) ---
             if getattr(self, '_is_interactive_session', False) and url_type == "artist":
-                import pick
-                
                 # 1. Static options for exact Lazy Evaluation
                 options = ["Album", "EP", "Single", "Live", "Compilation"]
                 
@@ -321,18 +350,17 @@ class QobuzDL:
                     "(The exact count per category will be resolved silently during download)"
                 )
                 
-                # Trigger the multiselect UI
-                selected_types_raw = pick.pick(
-                    options, 
-                    title_text, 
-                    multiselect=True, 
-                    min_selection_count=1
-                )
+                # Trigger the multiselect UI via Questionary
+                selected_types_raw = questionary.checkbox(
+                    title_text,
+                    choices=options,
+                    style=Q_STYLE,
+                ).ask()
                 
                 if selected_types_raw:
-                    self.allowed_release_types = [opt[0].lower() for opt in selected_types_raw]
+                    self.allowed_release_types = [opt.lower() for opt in selected_types_raw]
                 else:
-                    # User cancelled
+                    # User cancelled or selected nothing
                     self.allowed_release_types = []
                     items = []
             else:
@@ -413,16 +441,21 @@ class QobuzDL:
 
             # --- FASE 2: INTERACTIVE MENU ---
             if getattr(self, '_is_interactive_session', False) and url_type == "artist" and valid_items:
-                import pick
                 import time
                 
-                options = ["==> [ DOWNLOAD ALL FILTERED RELEASES ] <=="]
-                for v_item in valid_items:
+                choices = [
+                    questionary.Choice(
+                        title="==> [ DOWNLOAD ALL FILTERED RELEASES ] <==",
+                        value=0,
+                    )
+                ]
+                for idx, v_item in enumerate(valid_items, start=1):
                     t_title = v_item.get("title") or v_item.get("name") or "Unknown"
                     t_ver = v_item.get("version")
                     t_disp = f"{t_title} ({t_ver})" if t_ver else t_title
                     t_year = str(v_item.get("release_date_original") or v_item.get("release_date") or "")[:4]
-                    options.append(f"{t_disp} [{t_year}]" if t_year else t_disp)
+                    label = f"{t_disp} [{t_year}]" if t_year else t_disp
+                    choices.append(questionary.Choice(title=label, value=idx))
                     
                 title_text = (
                     f"Found {len(valid_items)} filtered releases for {content_name}.\n"
@@ -431,11 +464,16 @@ class QobuzDL:
                 
                 time.sleep(0.4)
                 
-                selected_albums_raw = pick.pick(options, title_text, multiselect=True, min_selection_count=1)
+                selected_indices = questionary.checkbox(
+                    title_text,
+                    choices=choices,
+                    style=Q_STYLE,
+                ).ask()
                 
-                selected_indices = [opt[1] for opt in selected_albums_raw]
-                
-                if 0 not in selected_indices:
+                if not selected_indices:
+                    valid_items = []
+                    logger.info(f"{YELLOW}[*] No releases selected. Skipping...{OFF}")
+                elif 0 not in selected_indices:
                     valid_items = [valid_items[i - 1] for i in selected_indices]
                     logger.info(f"{YELLOW}[*] Proceeding with {len(valid_items)} manually selected releases.{OFF}")
                 else:
@@ -453,87 +491,47 @@ class QobuzDL:
                     playlist_index=idx
                 )
 
+                # NOTA ARCHITETTURALE: Le righe seguenti (presenti nel vecchio core.py)
+                # eseguivano una seconda volta il filtro già completato in Fase 1 e
+                # invocavano una seconda volta download_from_id sullo stesso brano.
                 # --- NEW: ULTIMATE SMART RECONCILER (LAZY + HEURISTIC) ---
-                if getattr(self, 'allowed_release_types', None) and url_type == "artist":
-                    try:
-                        r_type = "unknown"
-                        
-                        # 1. Attempt to fetch official Qobuz tag
-                        full_meta = None
-                        if hasattr(self.client, "get_album_meta"):
-                            full_meta = self.client.get_album_meta(item["id"])
-                        elif hasattr(self.client, "get_album"):
-                            full_meta = self.client.get_album(item["id"])
-                            
-                        if full_meta:
-                            r_type = (full_meta.get("release_type") or full_meta.get("product_type") or "unknown").lower()
-                            
-                        # 2. Smart Reconciliation (Fixing Qobuz's bad data while protecting Pink Floyd)
-                        base_title = str(item.get("title", "")).lower()
-                        version_tag = str(item.get("version", "")).lower()
-                        t_count = item.get("tracks_count", 0)
-                        
-                        # Absolute keyword overrides (Human titles beat Qobuz database tags)
-                        if "live" in version_tag or "(live" in base_title or "- live" in base_title:
-                            r_type = "live"
-                        elif any(kw in base_title or kw in version_tag for kw in ["best of", "greatest hits", "anthology", "collection", "compilation"]):
-                            r_type = "compilation"
-                        elif " ep" in base_title or version_tag == "ep":
-                            r_type = "ep"
-                            
-                        # Track-count conflict resolution
-                        elif r_type == "single" and t_count >= 4:
-                            r_type = "ep"  # Fixes Belly's 4-track EPs tagged as Singles by Qobuz
-                        elif r_type == "ep" and 1 <= t_count <= 3:
-                            r_type = "single"
-                        elif r_type == "album" and 1 <= t_count <= 3:
-                            r_type = "single"
-                        # If Qobuz says "album" and tracks >= 4 (like Pink Floyd), we leave it alone!
-                        
-                        # Fallback for completely missing data
-                        elif r_type == "unknown":
-                            if 1 <= t_count <= 3:
-                                r_type = "single"
-                            elif 4 <= t_count <= 6:
-                                r_type = "ep"
-                            else:
-                                r_type = "album"
-
-                        # 3. Perform the silent skip check
-                        if r_type not in self.allowed_release_types:
-                            continue
-                            
-                    except Exception:
-                        pass
-                # ---------------------------------------------------------    
-                
-                if getattr(self, 'blacklist_patterns', None):
-                    base_title = item.get("title") or item.get("name") or ""
-                    version_tag = item.get("version") or ""
-                    
-                    display_name = f"{base_title} ({version_tag})" if version_tag else base_title
-                    display_lower = display_name.lower()
-                    
-                    is_blacklisted = False
-                    for pattern in self.blacklist_patterns:
-                        regex_pattern = rf"(?<!\w){re.escape(pattern)}(?!\w)"
-                        
-                        if re.search(regex_pattern, display_lower):
-                            is_blacklisted = True
-                            break
-                            
-                    if is_blacklisted:
-                        logger.info(f"{YELLOW}[!] Skipped (Blacklisted): {display_name}{OFF}")
-                        continue
-
-                queued_items.append(item)
-                self.download_from_id(
-                    item["id"],
-                    True if type_dict["iterable_key"] == "albums" else False,
-                    new_path,
-                    is_playlist=is_playlist,
-                    playlist_index=idx
-                )
+                # if getattr(self, 'allowed_release_types', None) and url_type == "artist":
+                #     try:
+                #         r_type = "unknown"
+                #         full_meta = None
+                #         if hasattr(self.client, "get_album_meta"):
+                #             full_meta = self.client.get_album_meta(item["id"])
+                #         elif hasattr(self.client, "get_album"):
+                #             full_meta = self.client.get_album(item["id"])
+                #         if full_meta:
+                #             r_type = (full_meta.get("release_type") or full_meta.get("product_type") or "unknown").lower()
+                #         base_title = str(item.get("title", "")).lower()
+                #         version_tag = str(item.get("version", "")).lower()
+                #         t_count = item.get("tracks_count", 0)
+                #         if "live" in version_tag or "(live" in base_title or "- live" in base_title:
+                #             r_type = "live"
+                #         elif any(kw in base_title or kw in version_tag for kw in ["best of", "greatest hits", "anthology", "collection", "compilation"]):
+                #             r_type = "compilation"
+                #         elif " ep" in base_title or version_tag == "ep":
+                #             r_type = "ep"
+                #         elif r_type == "single" and t_count >= 4:
+                #             r_type = "ep"
+                #         elif r_type == "ep" and 1 <= t_count <= 3:
+                #             r_type = "single"
+                #         elif r_type == "album" and 1 <= t_count <= 3:
+                #             r_type = "single"
+                #         elif r_type == "unknown":
+                #             if 1 <= t_count <= 3:
+                #                 r_type = "single"
+                #             elif 4 <= t_count <= 6:
+                #                 r_type = "ep"
+                #             else:
+                #                 r_type = "album"
+                #         if r_type not in self.allowed_release_types:
+                #             continue
+                #     except Exception:
+                #         pass
+                # ---------------------------------------------------------
 
             # --- RESTORE SETTINGS ---
             if is_playlist and not getattr(self, 'playlist_as_albums', False):
@@ -800,27 +798,13 @@ class QobuzDL:
         """
         Launches the Native Interactive Menu in the terminal.
         
-        Features a graphical multi-select interface (via the 'pick' library) to browse 
+        Features a graphical multi-select interface (via the 'questionary' library) to browse 
         the Qobuz catalog or the user's private Favorites, queueing up batches of URLs 
         for downloading.
         """
         # --- NEW: Flag to let the engine know we are in a TTY session ---
         self._is_interactive_session = True
         # ----------------------------------------------------------------
-        try:
-            import pick
-            # --- WINDOWS TERMINAL FIX & MULTISELECT LOOK ---
-            if hasattr(pick, 'SYMBOL_CIRCLE_EMPTY'):
-                pick.SYMBOL_CIRCLE_EMPTY = '[ ]'
-                pick.SYMBOL_CIRCLE_FILLED = '[X]'
-            # -----------------------------------------------
-        except (ImportError, ModuleNotFoundError):
-            if os.name == "nt":
-                sys.exit(
-                    "Please install curses with "
-                    '"pip3 install windows-curses" to continue'
-                )
-            raise
 
         qualities = [
             {"q_string": "320", "q": 5},
@@ -833,7 +817,14 @@ class QobuzDL:
             item_types = ["Albums", "Tracks", "Artists", "Playlists", "Favorites"]
             
             # Get the exact choice
-            scelta_raw = pick.pick(item_types, "I'll search for:\n[press Intro]")[0]
+            scelta_raw = questionary.select(
+                "I'll search for:\n[press Intro]",
+                choices=item_types,
+                style=Q_STYLE,
+            ).ask()
+            
+            if not scelta_raw:
+                return
             
             # Fix trailing 's' slicing (needed for album/track, but breaks Favorites)
             if scelta_raw == "Favorites":
@@ -848,7 +839,16 @@ class QobuzDL:
                 if selected_type == "favorites":
                     # --- FAVORITES FLOW: Choose the category instead of typing ---
                     fav_types = ["Albums", "Tracks", "Artists", "Playlists"]
-                    selected_fav = pick.pick(fav_types, "Which favorites do you want to browse?\n[press Intro]")[0].lower()
+                    selected_fav_raw = questionary.select(
+                        "Which favorites do you want to browse?\n[press Intro]",
+                        choices=fav_types,
+                        style=Q_STYLE,
+                    ).ask()
+                    
+                    if not selected_fav_raw:
+                        break
+                        
+                    selected_fav = selected_fav_raw.lower()
                     
                     logger.info(f"{YELLOW}Fetching your favorite {selected_fav}...{RESET}")
                     options = self.search_by_type(None, selected_type, limit=self.interactive_limit, fav_subtype=selected_fav)
@@ -874,14 +874,14 @@ class QobuzDL:
                     year_h = "YEAR".ljust(4)
                     
                     table_header = (
-                        f"       {artist_h}   {title_h}   {type_h}   {year_h}   QUALITY\n"
-                        f"       {'-' * 88}"
+                        f"     {artist_h}   {title_h}   {type_h}   {year_h}   QUALITY\n"
+                        f"     {'-' * 88}"
                     )
                 else:
                     name_h = "NAME".ljust(50)
                     table_header = (
-                        f"       {name_h}   RELEASES\n"
-                        f"       {'-' * 63}"
+                        f"     {name_h}   RELEASES\n"
+                        f"     {'-' * 63}"
                     )
                 # ------------------------------------------------------------------
 
@@ -892,20 +892,30 @@ class QobuzDL:
                     f"{table_header}"
                 )
                 
-                options_texts = [opt.get("text") for opt in options]
+                choices = [
+                    questionary.Choice(title=opt.get("text"), value=idx)
+                    for idx, opt in enumerate(options)
+                ]
                 
-                selected_items = pick.pick(
-                    options_texts,
+                selected_indices = questionary.checkbox(
                     title,
-                    multiselect=True,
-                    min_selection_count=0,
-                )
+                    choices=choices,
+                    style=Q_STYLE,
+                    instruction="",
+                ).ask()
                 
-                if len(selected_items) > 0:
-                    [final_url_list.append(options[i[1]]["url"]) for i in selected_items]
+                if selected_indices is None:
+                    return
+                
+                if len(selected_indices) > 0:
+                    [final_url_list.append(options[i]["url"]) for i in selected_indices]
                     
-                    y_n = pick.pick(["Yes", "No"], "Items were added to queue to be downloaded. Keep searching?")
-                    if y_n[0] == "No":
+                    y_n = questionary.select(
+                        "Items were added to queue to be downloaded. Keep searching?",
+                        choices=["Yes", "No"],
+                        style=Q_STYLE,
+                    ).ask()
+                    if y_n == "No" or y_n is None:
                         break
                 else:
                     logger.info(f"{YELLOW}Ok, try again...{RESET}")
@@ -915,9 +925,19 @@ class QobuzDL:
                     
             if final_url_list:
                 desc = "Select [intro] the quality (the quality will be automatically\ndowngraded if the selected is not found)"
-                qualities_texts = [q.get("q_string") for q in qualities]
-                selected_quality = pick.pick(qualities_texts, desc, default_index=1)
-                self.quality = qualities[selected_quality[1]]["q"]
+                qualities_choices = [
+                    questionary.Choice(title=q.get("q_string"), value=q.get("q"))
+                    for q in qualities
+                ]
+                selected_quality = questionary.select(
+                    desc,
+                    choices=qualities_choices,
+                    default=qualities_choices[1],
+                    style=Q_STYLE,
+                ).ask()
+                if selected_quality is None:
+                    return
+                self.quality = selected_quality
 
                 if download:
                     self.download_list_of_urls(final_url_list)

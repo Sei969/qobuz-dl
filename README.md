@@ -75,6 +75,7 @@ Qobuz-DL Ultimate allows deep customization of your library structure using vari
 
 ### ❤️ Native Favorites Sync & Interactive Menu
 Seamlessly bridge your mobile listening habits with your local offline library. Instead of manually copying URLs, launch the Interactive Mode (`fun`) to securely access your personal Qobuz account and browse your **Favorite Albums, Tracks, Artists, and Playlists** directly from the terminal.
+* **Next-Gen Questionary UI (Python 3.15 & Windows Ready):** The interactive terminal engine has been completely migrated from legacy `pick` (`windows-curses`) to **`Questionary` (`prompt_toolkit`)**. This guarantees 100% native compatibility with **Python 3.15+** across Windows, macOS, and Linux, featuring custom high-contrast styling and CJK/East-Asian wide-character column alignment.
 * **Zero-Typing Workflow:** Fetch your private library with a single click without ever leaving the terminal.
 * **Massive Batch Downloading:** Use the `Spacebar` to multi-select dozens of your favorite releases from the clean, minimalist UI and queue them all up for download in seconds.
 * **Smart Release Filter & Cherry-Picking:** When fetching an artist's discography, the engine runs a blazing-fast local heuristic algorithm to categorize releases (Albums, EPs, Singles, Live). It presents a two-stage UI: first, filter out unwanted macro-categories (e.g., skip all Singles). Second, a cherry-picking menu allows you to multi-select specific titles by name and release year, letting you easily skip unwanted duplicates like "Deluxe" or "Remastered" editions before the download even begins, saving massive amounts of time and storage.
@@ -86,11 +87,11 @@ To prevent downloading incorrect songs, this fork utilizes a mathematical **Fuzz
 * **Auto-Skip (< 60%):** Completely wrong tracks are automatically skipped.
 * **Interactive Selection (60% - 74%):** For borderline matches, the engine pauses and activates an interactive prompt allowing you to manually approve or reject the track (`[y/n]`).
 
-### 📡 MusicButler RSS Radar (Automated Favorites Sync)
-Never miss a new release from your tracked artists. The new `radar` command seamlessly integrates with your private **MusicButler** RSS feed to automate your discovery workflow.
-* **Smart Feed Parsing:** Automatically fetches and parses your private RSS/Atom feed to find the latest releases from the artists you follow.
+### 📡 MusicButler RSS Radar (Automated Favorites Sync & Instant Download)
+Never miss a new release from your tracked artists. The `radar` command seamlessly integrates with your private **MusicButler** RSS feed to automate your discovery and acquisition workflow.
+* **Smart Feed Parsing & Query Sanitization:** Automatically fetches your private RSS/Atom feed and strips narrative feed formatting (e.g., `Artist released "Title"`) via regex before querying Qobuz for maximum search accuracy.
 * **Fuzzy Qobuz Matching:** Queries the Qobuz database to find the exact high-resolution matches for your daily new releases.
-* **Interactive Checkbox UI:** Presents a clean, interactive terminal menu where you can multi-select (`Spacebar`) the fresh releases and instantly inject them into your Qobuz Favorites (`Enter`), ready to be downloaded later via the `fun` mode.
+* **Interactive Checkbox UI & Direct Download:** Presents a custom-styled `Questionary` terminal menu where you can multi-select (`Spacebar`) fresh releases to instantly inject them into your Qobuz Favorites (`Enter`), followed by an immediate prompt to **download the selected albums right away** using your `config.ini` settings.
 * **Secure XML Parsing:** Private RSS feeds are processed using `defusedxml` alongside strict pre-flight URL schema validation. This completely neutralizes XXE (XML External Entity) attacks and SSRF vulnerabilities when syncing external data.
 
 ### 🛡️ Fail-Safe Folder Management & Smart Resume
@@ -112,6 +113,8 @@ pip install qobuz-dl-ultimate
 ```
 *Once installed, you can launch the program from any folder on your computer by simply typing `qobuz-dl` or `qdl`.*
 
+> **🔄 Upgrading for Existing PyPI Users:** Run `pip install -U qobuz-dl-ultimate` to fetch the latest release and automatically install the new `questionary` UI dependencies (fully compatible with **Python 3.15+**).
+
 ### Option B: Pre-built Binaries (Windows x64)
 The easiest way to run the program on Windows without installing Python.
 👉 **[Download the latest ZIP here](https://github.com/Sei969/qobuz-dl/releases/latest)**
@@ -126,6 +129,8 @@ cd qobuz-dl
 pip3 install -r requirements.txt
 ```
 *Run the program using:* `python -m qobuz_dl`
+
+> **🔄 Upgrading for Existing Git Users (Python 3.15 Migration):** After running `git pull`, update your environment with `pip3 install -U -r requirements.txt`. Since the interactive UI now runs on `questionary` instead of `pick`, Windows users can optionally remove the obsolete curses bindings by running `pip3 uninstall pick windows-curses -y`.
 
 ### Option D: 🐳 Docker Usage (NAS & Home Servers)
 The Ultimate Edition is fully containerized and includes all dependencies (Python, FFmpeg). This is the recommended installation method for Synology, QNAP, Unraid, and headless servers.
@@ -235,7 +240,7 @@ usage: python -m qobuz_dl dl [-h] [-d PATH] [-q int] [--albums-only] [--no-m3u] 
 ```
 
 **MusicButler Radar Mode:**
-*(Tip: Run it once to save your RSS link, then run it daily to catch new releases and securely add them to your Qobuz favorites!)*
+*(Tip: Run it once to save your RSS link, then run it daily to catch new releases, sync them to your Qobuz Favorites, and optionally download them on the spot!)*
 ```bash
 python -m qobuz_dl radar
 ```
