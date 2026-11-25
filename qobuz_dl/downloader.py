@@ -382,6 +382,21 @@ class Download:
             album_meta, album_title, file_format, bit_depth, sampling_rate
         )
         
+        if int(self.quality) in (7, 27):
+            track_qualities = sorted(
+                {
+                    (t.get("maximum_bit_depth"), t.get("maximum_sampling_rate"))
+                    for t in album_meta.get("tracks", {}).get("items", [])
+                    if t.get("maximum_bit_depth") and t.get("maximum_sampling_rate")
+                }
+            )
+            if len(track_qualities) > 1:
+                tiers_str = ", ".join(f"{bd}b/{sr}kHz" for bd, sr in track_qualities)
+                logger.info(
+                    f"{CYAN}[*] Mixed-resolution release on Qobuz ({tiers_str}): "
+                    f"each track will be downloaded at the highest available quality within your selected tier.{OFF}\n"
+                )
+        
         self._determine_formats(album_meta=album_meta, album_attr=album_attr, tracks_meta=album_meta["tracks"]["items"],
                                 track_attr=None, is_track=False, file_format=file_format, settings=self.settings)
         
@@ -1075,14 +1090,24 @@ class Download:
 
     def _get_format(self, item_dict, is_track_id=False, track_url_dict=None):
         """Checks stream restrictions and determines the actual obtainable audio format."""
-        # Aggiungi questa protezione anti-crash SOLO per le release complete (Album/EP)
         if not is_track_id:
-            if "tracks" not in item_dict or not item_dict["tracks"].get("items"):
+            tracks = item_dict.get("tracks", {}).get("items") or []
+            if not tracks:
                 from qobuz_dl.exceptions import NonStreamable
                 raise NonStreamable("This release has no tracks available (possibly region-locked or removed)")
 
-        # FIX: Applica la logica corretta a seconda se è una traccia singola o un album
-        track_dict = item_dict if is_track_id else item_dict["tracks"]["items"][0]
+            # Probe the highest-resolution streamable track so mixed-quality releases
+            # (e.g., Deluxe Editions) are not misreported based solely on track 1.
+            track_dict = max(
+                tracks,
+                key=lambda t: (
+                    bool(t.get("streamable", True)),
+                    t.get("maximum_bit_depth") or 0,
+                    t.get("maximum_sampling_rate") or 0,
+                ),
+            )
+        else:
+            track_dict = item_dict
         
         # INIZIALIZZAZIONE MANCANTE: Di default la qualità è rispettata!
         quality_met = True
