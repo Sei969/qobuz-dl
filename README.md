@@ -431,6 +431,8 @@ You can deeply customize your `config.ini` or use the CLI flags `-ff` (Folder Fo
 | `{isrc}` | The unique ISRC identifier of the track. | `USSM11302305` |
 | `{album_id}` / `{track_id}` | Qobuz internal database IDs. | `123456789` |
 
+> **💡 Tip — Literal Curly Brackets:** Need literal `{` or `}` characters in your folder, track, or tag formats? Escape them by doubling the brackets (`{{` and `}}`). For example, `{{{upc}}}` outputs `{888837168618}` (and if a field is empty, the resulting `{}` is automatically cleaned up).
+
 #### 💡 Real-World Examples
 
 **1. The "Audiophile Archive" Strategy (Nested Folders)**
